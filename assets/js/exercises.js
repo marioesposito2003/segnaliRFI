@@ -212,12 +212,20 @@ function initializeRailwayEditor() {
     loadSavedRailways();
     createEditorInterface();
     
-    // Attendiamo che il DOM sia aggiornato prima di setupare drag & drop
+    // Attendiamo che il DOM sia aggiornato prima di setupare tutto
     setTimeout(() => {
+        console.log('🔧 Setup canvas e drag & drop...');
         setupCanvas();
         setupDragAndDrop();
+        
+        // Debug iniziale
+        console.log('🔍 Debug iniziale:');
+        console.log('Canvas trovato:', !!document.getElementById('railwayCanvas'));
+        console.log('Elementi palette:', document.querySelectorAll('.element-item').length);
+        console.log('RAILWAY_EDITOR state:', RAILWAY_EDITOR);
+        
         console.log('✅ Editor inizializzato');
-    }, 100);
+    }, 500); // Aumento timeout a 500ms
 }
 
 function createEditorInterface() {
@@ -401,14 +409,19 @@ function createEditorInterface() {
 
 function setupCanvas() {
     const canvas = document.getElementById('railwayCanvas');
-    RAILWAY_EDITOR.canvas = canvas;
+    console.log('🖼️ Setup canvas:', canvas);
     
     if (!canvas) {
         console.error('❌ Canvas non trovato!');
+        // Proviamo a cercarlo diversamente
+        const allCanvas = document.querySelectorAll('canvas');
+        console.log('Canvas presenti:', allCanvas.length);
         return;
     }
     
+    RAILWAY_EDITOR.canvas = canvas;
     const ctx = canvas.getContext('2d');
+    console.log('Canvas context:', ctx);
     
     // Event listeners per il canvas
     canvas.addEventListener('drop', handleCanvasDrop);
@@ -416,74 +429,155 @@ function setupCanvas() {
     canvas.addEventListener('click', handleCanvasClick);
     canvas.addEventListener('mousemove', handleCanvasMouseMove);
     
+    console.log('🎯 Event listeners aggiunti al canvas');
+    
+    // Test: disegna qualcosa per vedere se il canvas funziona
+    ctx.fillStyle = '#f0f0f0';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#333';
+    ctx.font = '16px Arial';
+    ctx.fillText('Canvas Attivo - Trascinare qui gli elementi', 50, 200);
+    
     // Disegna griglia iniziale
     drawGrid();
     updateCanvasInfo();
     
-    console.log('🖼️ Canvas inizializzato');
+    console.log('🖼️ Canvas inizializzato con successo');
 }
 
 function setupDragAndDrop() {
-    // Setup per elementi della palette
+    // Aspetta che gli elementi siano nel DOM
     const elementItems = document.querySelectorAll('.element-item');
     console.log(`🖱️ Setup drag & drop per ${elementItems.length} elementi`);
     
-    elementItems.forEach(item => {
+    if (elementItems.length === 0) {
+        console.error('❌ Nessun elemento .element-item trovato!');
+        // Retry dopo un altro timeout
+        setTimeout(setupDragAndDrop, 1000);
+        return;
+    }
+    
+    elementItems.forEach((item, index) => {
+        const elementId = item.dataset.element;
+        console.log(`🔧 Setup elemento ${index}: ${elementId}`);
+        
+        // Drag eventi
         item.addEventListener('dragstart', handleDragStart);
         item.addEventListener('dragend', handleDragEnd);
         
-        // Backup per browser che non supportano drag nativo
+        // Backup click per test
+        item.addEventListener('click', function(e) {
+            console.log('🖱️ Click su elemento:', elementId);
+            // Test: aggiungi direttamente al centro del canvas
+            if (RAILWAY_ELEMENTS[elementId]) {
+                console.log('📍 Aggiunta elemento al centro canvas');
+                addElementToCanvas(RAILWAY_ELEMENTS[elementId], 400, 200);
+            }
+        });
+        
+        // Mouse events come fallback
         item.addEventListener('mousedown', handleMouseDown);
     });
+    
+    console.log('✅ Drag & drop configurato');
 }
 
 function handleDragStart(e) {
-    const elementId = e.target.closest('.element-item').dataset.element;
-    RAILWAY_EDITOR.draggedElement = RAILWAY_ELEMENTS[elementId];
-    e.dataTransfer.setData('text/plain', elementId);
+    const item = e.target.closest('.element-item');
+    const elementId = item ? item.dataset.element : null;
     
-    // Effetto visivo
-    e.target.style.opacity = '0.5';
+    console.log('🖱️ DRAG START:', elementId);
+    console.log('Elemento dati:', RAILWAY_ELEMENTS[elementId]);
     
-    console.log('🖱️ Iniziato drag:', elementId);
+    if (elementId && RAILWAY_ELEMENTS[elementId]) {
+        RAILWAY_EDITOR.draggedElement = RAILWAY_ELEMENTS[elementId];
+        e.dataTransfer.setData('text/plain', elementId);
+        e.target.style.opacity = '0.5';
+        console.log('✅ Drag avviato correttamente');
+    } else {
+        console.error('❌ Elemento non trovato per drag:', elementId);
+    }
 }
 
 function handleDragEnd(e) {
+    console.log('🖱️ DRAG END');
     e.target.style.opacity = '';
-    RAILWAY_EDITOR.draggedElement = null;
+    // Non resettiamo draggedElement qui - lo facciamo nel drop
 }
 
 function handleMouseDown(e) {
-    // Fallback per dispositivi touch o problemi con drag nativo
     const item = e.target.closest('.element-item');
     if (item) {
-        item.classList.add('dragging');
         const elementId = item.dataset.element;
+        console.log('🖱️ Mouse down fallback:', elementId);
+        
+        item.classList.add('dragging');
         RAILWAY_EDITOR.draggedElement = RAILWAY_ELEMENTS[elementId];
-        console.log('🖱️ Mouse drag fallback:', elementId);
+        
+        // Aggiungi listener temporaneo per il rilascio
+        const handleMouseUp = (mouseEvent) => {
+            console.log('🖱️ Mouse up - rilascio elemento');
+            item.classList.remove('dragging');
+            
+            // Se siamo sopra il canvas, aggiungi elemento
+            const canvas = RAILWAY_EDITOR.canvas;
+            if (canvas) {
+                const rect = canvas.getBoundingClientRect();
+                const x = mouseEvent.clientX - rect.left;
+                const y = mouseEvent.clientY - rect.top;
+                
+                if (x >= 0 && x <= canvas.width && y >= 0 && y <= canvas.height) {
+                    console.log('📍 Rilascio sopra canvas:', x, y);
+                    const snappedX = Math.round(x / RAILWAY_EDITOR.gridSize) * RAILWAY_EDITOR.gridSize;
+                    const snappedY = Math.round(y / RAILWAY_EDITOR.gridSize) * RAILWAY_EDITOR.gridSize;
+                    addElementToCanvas(RAILWAY_EDITOR.draggedElement, snappedX, snappedY);
+                }
+            }
+            
+            RAILWAY_EDITOR.draggedElement = null;
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+        
+        document.addEventListener('mouseup', handleMouseUp);
     }
 }
 
 function handleCanvasDragOver(e) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
+    console.log('🖱️ Drag over canvas');
 }
 
 function handleCanvasDrop(e) {
     e.preventDefault();
+    console.log('🖱️ DROP su canvas!');
+    console.log('Elemento trascinato:', RAILWAY_EDITOR.draggedElement);
     
     if (!RAILWAY_EDITOR.draggedElement) {
-        console.log('⚠️ Nessun elemento da trascinare');
-        return;
+        console.log('⚠️ Nessun elemento da trascinare - provo con dataTransfer');
+        const elementId = e.dataTransfer.getData('text/plain');
+        console.log('Element ID da dataTransfer:', elementId);
+        
+        if (elementId && RAILWAY_ELEMENTS[elementId]) {
+            RAILWAY_EDITOR.draggedElement = RAILWAY_ELEMENTS[elementId];
+            console.log('✅ Elemento recuperato da dataTransfer');
+        } else {
+            console.error('❌ Impossibile ottenere elemento per drop');
+            return;
+        }
     }
     
     const rect = RAILWAY_EDITOR.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
+    console.log('📍 Posizione drop:', x, y);
+    
     // Snap alla griglia
     const snappedX = Math.round(x / RAILWAY_EDITOR.gridSize) * RAILWAY_EDITOR.gridSize;
     const snappedY = Math.round(y / RAILWAY_EDITOR.gridSize) * RAILWAY_EDITOR.gridSize;
+    
+    console.log('📍 Posizione snapped:', snappedX, snappedY);
     
     addElementToCanvas(RAILWAY_EDITOR.draggedElement, snappedX, snappedY);
     RAILWAY_EDITOR.draggedElement = null;
@@ -492,6 +586,8 @@ function handleCanvasDrop(e) {
     document.querySelectorAll('.element-item.dragging').forEach(item => {
         item.classList.remove('dragging');
     });
+    
+    console.log('✅ Drop completato');
 }
 
 function handleCanvasClick(e) {
@@ -499,8 +595,11 @@ function handleCanvasClick(e) {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
+    console.log('🖱️ Click canvas:', x, y);
+    
     // Se abbiamo un elemento trascinato dal mouse, lo posizioniamo
     if (RAILWAY_EDITOR.draggedElement) {
+        console.log('📍 Posizionamento elemento da click');
         const snappedX = Math.round(x / RAILWAY_EDITOR.gridSize) * RAILWAY_EDITOR.gridSize;
         const snappedY = Math.round(y / RAILWAY_EDITOR.gridSize) * RAILWAY_EDITOR.gridSize;
         
@@ -518,6 +617,7 @@ function handleCanvasClick(e) {
     const clickedElement = findElementAtPosition(x, y);
     
     if (clickedElement) {
+        console.log('🎯 Elemento cliccato:', clickedElement.id);
         if (RAILWAY_EDITOR.mode === 'build') {
             if (RAILWAY_EDITOR.isConnecting) {
                 handleConnectionClick(clickedElement);
@@ -535,7 +635,10 @@ function handleCanvasMouseMove(e) {
     const x = Math.round((e.clientX - rect.left) / RAILWAY_EDITOR.gridSize) * RAILWAY_EDITOR.gridSize;
     const y = Math.round((e.clientY - rect.top) / RAILWAY_EDITOR.gridSize) * RAILWAY_EDITOR.gridSize;
     
-    document.getElementById('canvasCoords').textContent = `Coordinate: (${x}, ${y})`;
+    const coordsElement = document.getElementById('canvasCoords');
+    if (coordsElement) {
+        coordsElement.textContent = `Coordinate: (${x}, ${y})`;
+    }
 }
 
 /**
@@ -545,6 +648,12 @@ function handleCanvasMouseMove(e) {
  */
 
 function addElementToCanvas(elementType, x, y) {
+    console.log('➕ Aggiunta elemento al canvas:');
+    console.log('Tipo:', elementType);
+    console.log('Posizione:', x, y);
+    console.log('Canvas:', RAILWAY_EDITOR.canvas);
+    console.log('Elementi attuali:', RAILWAY_EDITOR.elements.length);
+    
     const newElement = {
         id: generateElementId(),
         type: elementType.type,
@@ -559,10 +668,13 @@ function addElementToCanvas(elementType, x, y) {
     };
     
     RAILWAY_EDITOR.elements.push(newElement);
+    console.log('📝 Elemento aggiunto:', newElement);
+    console.log('📊 Totale elementi:', RAILWAY_EDITOR.elements.length);
+    
     redrawCanvas();
     updateCanvasInfo();
     
-    console.log('➕ Elemento aggiunto:', newElement);
+    console.log('✅ Elemento aggiunto con successo');
 }
 
 function removeElement(element) {
@@ -674,9 +786,12 @@ function createConnection(element1, element2) {
  */
 
 function drawGrid() {
-    if (!document.getElementById('showGrid') || !document.getElementById('showGrid').checked) return;
+    const showGridElement = document.getElementById('showGrid');
+    if (!showGridElement || !showGridElement.checked) return;
     
     const canvas = RAILWAY_EDITOR.canvas;
+    if (!canvas) return;
+    
     const ctx = canvas.getContext('2d');
     const gridSize = RAILWAY_EDITOR.gridSize;
     
@@ -702,12 +817,21 @@ function drawGrid() {
 
 function redrawCanvas() {
     const canvas = RAILWAY_EDITOR.canvas;
-    if (!canvas) return;
+    if (!canvas) {
+        console.error('❌ Canvas non disponibile per ridisegno');
+        return;
+    }
     
     const ctx = canvas.getContext('2d');
     
+    console.log('🖼️ Ridisegno canvas - elementi:', RAILWAY_EDITOR.elements.length);
+    
     // Pulisce canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Sfondo
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     // Ridisegna griglia
     drawGrid();
@@ -716,9 +840,21 @@ function redrawCanvas() {
     drawConnections(ctx);
     
     // Disegna tutti gli elementi
-    RAILWAY_EDITOR.elements.forEach(element => {
+    RAILWAY_EDITOR.elements.forEach((element, index) => {
+        console.log(`🎨 Disegno elemento ${index}:`, element.id, 'pos:', element.x, element.y);
         drawElement(ctx, element);
     });
+    
+    // Se non ci sono elementi, mostra messaggio
+    if (RAILWAY_EDITOR.elements.length === 0) {
+        ctx.fillStyle = '#999';
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Trascina elementi qui dal pannello laterale', canvas.width / 2, canvas.height / 2);
+        ctx.fillText('oppure clicca su un elemento e poi qui per posizionarlo', canvas.width / 2, canvas.height / 2 + 25);
+    }
+    
+    console.log('✅ Canvas ridisegnato');
 }
 
 function drawConnections(ctx) {
@@ -726,21 +862,25 @@ function drawConnections(ctx) {
     ctx.lineWidth = 3;
     
     RAILWAY_EDITOR.elements.forEach(element => {
-        element.connections.forEach(connection => {
-            const target = RAILWAY_EDITOR.elements.find(el => el.id === connection.elementId);
-            if (target) {
-                ctx.beginPath();
-                ctx.moveTo(element.x, element.y);
-                ctx.lineTo(target.x, target.y);
-                ctx.stroke();
-            }
-        });
+        if (element.connections) {
+            element.connections.forEach(connection => {
+                const target = RAILWAY_EDITOR.elements.find(el => el.id === connection.elementId);
+                if (target) {
+                    ctx.beginPath();
+                    ctx.moveTo(element.x, element.y);
+                    ctx.lineTo(target.x, target.y);
+                    ctx.stroke();
+                }
+            });
+        }
     });
 }
 
 function drawElement(ctx, element) {
     const x = element.x;
     const y = element.y;
+    
+    console.log(`🎨 Disegno elemento ${element.id} a (${x}, ${y})`);
     
     // Cerchio/forma di base
     let radius = 20;
@@ -772,7 +912,7 @@ function drawElement(ctx, element) {
         ctx.strokeStyle = '#28a745';
         ctx.lineWidth = 3;
     } else {
-        ctx.fillStyle = element.data.color;
+        ctx.fillStyle = element.data.color || '#ccc';
         ctx.strokeStyle = '#2c3e50';
         ctx.lineWidth = 2;
     }
@@ -790,7 +930,7 @@ function drawElement(ctx, element) {
         const signal = Object.values(SIGNAL_TYPES).find(s => s.id === element.signalType);
         ctx.fillText(signal ? signal.icon : '?', 0, 0);
     } else {
-        ctx.fillText(element.data.icon, 0, 0);
+        ctx.fillText(element.data.icon || '?', 0, 0);
     }
     
     ctx.restore();
@@ -799,7 +939,9 @@ function drawElement(ctx, element) {
     ctx.font = '10px Arial';
     ctx.fillStyle = '#7f8c8d';
     ctx.textAlign = 'center';
-    ctx.fillText(element.data.name, x, y + 35);
+    ctx.fillText(element.data.name || 'Elemento', x, y + 35);
+    
+    console.log(`✅ Elemento ${element.id} disegnato`);
 }
 
 /**
