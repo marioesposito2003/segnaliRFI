@@ -1,421 +1,374 @@
 /**
- * MAIN CONTROLLER - EDITOR LINEE FERROVIARIE RFI
- * ==============================================
- * Sistema per costruire e utilizzare linee ferroviarie personalizzate
+ * MAIN.JS - COMPATIBILITÀ CON EDITOR MODERNO
+ * ==========================================
+ * Sistema principale per gestire segnali e esercizi
+ * con supporto per la nuova interfaccia dell'editor
  */
 
-// Stato globale dell'applicazione
+// Stato principale dell'applicazione
 const APP_STATE = {
-    currentMode: 'build', // 'build' o 'play' o 'exercise'
-    selectedStartSignal: null,
-    selectedEndSignal: null,
+    currentMode: 'exercises', // 'exercises' o 'editor'
+    selectedSignals: [],
     currentExercise: null,
-    userSolution: [],
-    systemType: 2, // 2 aspetti o 3 aspetti
-    isExerciseActive: false
+    solutions: [],
+    signalTypes: {}
 };
 
 /**
  * ==========================================
- * INIZIALIZZAZIONE APPLICAZIONE
+ * INIZIALIZZAZIONE PRINCIPALE
  * ==========================================
  */
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Avvio Editor Linee Ferroviarie RFI');
+    console.log('🚀 Inizializzazione Sistema RFI');
     
     // Carica tipi di segnali
-    if (typeof loadSignalTypes === 'function') {
-        loadSignalTypes();
-    }
+    loadSignalTypes();
     
-    // Inizializza editor
-    if (typeof initializeRailwayEditor === 'function') {
-        initializeRailwayEditor();
+    // Determina modalità basata su URL o contenuto pagina
+    if (document.querySelector('.exercise-info')) {
+        // Siamo nella pagina dell'editor
+        APP_STATE.currentMode = 'editor';
+        console.log('📝 Modalità Editor attivata');
+    } else {
+        // Modalità esercizi classica
+        APP_STATE.currentMode = 'exercises';
+        initializeExerciseMode();
+        console.log('🎮 Modalità Esercizi attivata');
     }
-    
-    console.log('✅ Applicazione inizializzata');
 });
 
 /**
  * ==========================================
- * GESTIONE MODALITÀ GIOCO - SELEZIONE SEGNALI
+ * MODALITÀ ESERCIZI CLASSICA
  * ==========================================
  */
 
-function handleSignalSelection(element) {
-    if (element.type !== 'signal') {
-        console.log('⚠️ Elemento selezionato non è un segnale');
-        return;
-    }
+function initializeExerciseMode() {
+    setupExerciseInterface();
+    loadDefaultExercises();
+    bindExerciseEvents();
+}
+
+function setupExerciseInterface() {
+    // Interfaccia per esercizi classici sui segnali
+    const exerciseContainer = document.querySelector('.signal-exercise') || 
+                             document.querySelector('.exercise-container');
     
-    if (!APP_STATE.selectedStartSignal) {
-        // Primo click = segnale di partenza (verde)
-        APP_STATE.selectedStartSignal = element;
-        element.data.color = '#27ae60'; // Verde
-        updateSignalVisual(element, 'start');
-        
-        console.log('🟢 Segnale di partenza selezionato:', element.id);
-        
-    } else if (!APP_STATE.selectedEndSignal && element !== APP_STATE.selectedStartSignal) {
-        // Secondo click = segnale di arrivo (rosso)
-        APP_STATE.selectedEndSignal = element;
-        element.data.color = '#e74c3c'; // Rosso
-        updateSignalVisual(element, 'end');
-        
-        console.log('🔴 Segnale di arrivo selezionato:', element.id);
-        
-        // Mostra pulsante per iniziare esercizio
-        showStartExerciseButton();
-        
-    } else {
-        // Reset se clicca su segnali già selezionati
-        resetSignalSelection();
-    }
-    
-    // Ridisegna canvas
-    if (typeof redrawCanvas === 'function') {
-        redrawCanvas();
+    if (!exerciseContainer) {
+        console.log('ℹ️ Container esercizi non trovato, creazione automatica...');
+        createExerciseContainer();
     }
 }
 
-function updateSignalVisual(element, type) {
-    if (type === 'start') {
-        element.data.icon = '🟢';
-        element.data.name = 'PARTENZA';
-    } else if (type === 'end') {
-        element.data.icon = '🔴';
-        element.data.name = 'ARRIVO';
-    }
-}
-
-function resetSignalSelection() {
-    // Reset visuale segnali
-    if (APP_STATE.selectedStartSignal) {
-        APP_STATE.selectedStartSignal.data.color = '#ddd';
-        APP_STATE.selectedStartSignal.data.icon = '⚪';
-        APP_STATE.selectedStartSignal.data.name = 'Segnale Vuoto';
-    }
-    
-    if (APP_STATE.selectedEndSignal) {
-        APP_STATE.selectedEndSignal.data.color = '#ddd';
-        APP_STATE.selectedEndSignal.data.icon = '⚪';
-        APP_STATE.selectedEndSignal.data.name = 'Segnale Vuoto';
-    }
-    
-    // Reset stato
-    APP_STATE.selectedStartSignal = null;
-    APP_STATE.selectedEndSignal = null;
-    
-    // Nasconde pulsante esercizio
-    document.getElementById('startExerciseBtn').style.display = 'none';
-    
-    // Ridisegna canvas
-    if (typeof redrawCanvas === 'function') {
-        redrawCanvas();
-    }
-    
-    console.log('🔄 Selezione segnali resettata');
-}
-
-function showStartExerciseButton() {
-    const btn = document.getElementById('startExerciseBtn');
-    if (btn) {
-        btn.style.display = 'block';
-        btn.innerHTML = `🚀 Esercizio: ${APP_STATE.selectedStartSignal.id} → ${APP_STATE.selectedEndSignal.id}`;
-    }
-}
-
-/**
- * ==========================================
- * AVVIO ESERCIZIO SEGNALI
- * ==========================================
- */
-
-function startSignalExercise() {
-    if (!APP_STATE.selectedStartSignal || !APP_STATE.selectedEndSignal) {
-        alert('⚠️ Seleziona prima un segnale di partenza e uno di arrivo!');
-        return;
-    }
-    
-    console.log('🚀 Avvio esercizio segnali');
-    
-    // Prepara esercizio
-    const exercise = createExerciseFromRailway();
-    
-    if (!exercise) {
-        alert('❌ Errore nella creazione dell\'esercizio');
-        return;
-    }
-    
-    // Cambia modalità a esercizio
-    APP_STATE.currentMode = 'exercise';
-    APP_STATE.currentExercise = exercise;
-    APP_STATE.isExerciseActive = true;
-    
-    // Nasconde interfaccia di gioco e mostra interfaccia esercizio
-    showExerciseInterface(exercise);
-}
-
-function createExerciseFromRailway() {
-    const railway = RAILWAY_EDITOR.selectedRailway;
-    if (!railway) return null;
-    
-    // Filtra solo i segnali dalla linea
-    const signals = railway.elements.filter(el => el.type === 'signal');
-    
-    if (signals.length < 2) {
-        alert('⚠️ La linea deve avere almeno 2 segnali!');
-        return null;
-    }
-    
-    // Calcola distanza approssimativa tra partenza e arrivo
-    const distance = calculateDistance(APP_STATE.selectedStartSignal, APP_STATE.selectedEndSignal);
-    
-    // Determina velocità media (parzialmente casuale per varietà)
-    const baseSpeed = 80 + Math.random() * 40; // 80-120 km/h
-    
-    // Calcola complessità
-    const complexity = Math.max(4, Math.min(12, Math.ceil(distance / 100) + signals.length));
-    
-    return {
-        id: 'custom_' + Date.now(),
-        startSignal: APP_STATE.selectedStartSignal,
-        endSignal: APP_STATE.selectedEndSignal,
-        railway: railway,
-        distance: Math.round(distance),
-        averageSpeed: Math.round(baseSpeed),
-        signalCount: complexity,
-        systemType: APP_STATE.systemType,
-        allSignals: signals
-    };
-}
-
-function calculateDistance(signal1, signal2) {
-    // Calcola distanza euclidea e converte in metri (approssimativo)
-    const dx = signal1.x - signal2.x;
-    const dy = signal1.y - signal2.y;
-    const pixelDistance = Math.sqrt(dx * dx + dy * dy);
-    
-    // Converte pixel in metri (1 pixel ≈ 2 metri)
-    return pixelDistance * 2;
-}
-
-/**
- * ==========================================
- * INTERFACCIA ESERCIZIO SEGNALI
- * ==========================================
- */
-
-function showExerciseInterface(exercise) {
-    const container = document.querySelector('.exercise-info');
-    
+function createExerciseContainer() {
+    const container = document.createElement('div');
+    container.className = 'signal-exercise';
     container.innerHTML = `
         <div class="exercise-header">
-            <h3>🚦 Esercizio Segnali: ${exercise.railway.name}</h3>
-            <button class="control-btn secondary" onclick="backToRailwaySelection()">
-                ← Torna alla Selezione Linea
-            </button>
-        </div>
-        
-        <div class="exercise-info-grid">
-            <div class="info-item">
-                <span class="info-label">🟢 Partenza:</span>
-                <span class="info-value">${exercise.startSignal.id}</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">🔴 Arrivo:</span>
-                <span class="info-value">${exercise.endSignal.id}</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">📏 Distanza:</span>
-                <span class="info-value">${exercise.distance}m</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">⚡ Velocità Media:</span>
-                <span class="info-value">${exercise.averageSpeed} km/h</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">🚦 Segnali Richiesti:</span>
-                <span class="info-value">${exercise.signalCount}</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">🔄 Sistema:</span>
-                <span class="info-value">${exercise.systemType} aspetti</span>
+            <h2>🚦 Esercizi Segnali RFI</h2>
+            <div class="exercise-stats">
+                <span id="exerciseCount">0 esercizi</span>
+                <span id="completedCount">0 completati</span>
             </div>
         </div>
         
-        <div class="track-visualization">
-            <h4>🛤️ Binario da Segnalare</h4>
-            <div class="track-container">
-                <div class="signal-positions" id="signalPositions">
-                    <!-- Posizioni segnali generate dinamicamente -->
-                </div>
-            </div>
-        </div>
-        
-        <div class="controls">
-            <div class="signal-selection">
-                <h4>🚦 Seleziona Tipo Segnale</h4>
-                <div class="signal-grid" id="signalGrid">
-                    <!-- Griglia segnali caricata da signals.js -->
-                </div>
+        <div class="exercise-content">
+            <div class="signal-grid" id="signalGrid">
+                <!-- Griglia segnali generata dinamicamente -->
             </div>
             
-            <div class="control-buttons">
+            <div class="exercise-controls">
                 <button class="control-btn primary" onclick="checkSolution()">
                     ✅ Verifica Soluzione
                 </button>
                 <button class="control-btn secondary" onclick="resetExercise()">
-                    🔄 Ricomincia
+                    🔄 Reset
                 </button>
-                <button class="control-btn" onclick="saveSolution()">
-                    💾 Salva Soluzione
+                <button class="control-btn secondary" onclick="showHint()">
+                    💡 Suggerimento
                 </button>
-                <button class="control-btn" onclick="showOtherSolutions()">
-                    👥 Vedi Altre Soluzioni
-                </button>
+            </div>
+            
+            <div class="exercise-feedback" id="exerciseFeedback">
+                <!-- Feedback dinamico -->
             </div>
         </div>
     `;
     
-    // Inizializza l'esercizio
-    initializeExercise(exercise);
-}
-
-function initializeExercise(exercise) {
-    // Crea posizioni per i segnali
-    createSignalPositions(exercise.signalCount);
-    
-    // Popola griglia segnali disponibili
-    populateSignalGrid();
-    
-    // Imposta segnali di partenza e arrivo fissi
-    setFixedSignals(exercise);
-    
-    // Inizializza array soluzione utente
-    APP_STATE.userSolution = new Array(exercise.signalCount).fill(null);
-    
-    console.log('🚦 Esercizio inizializzato:', exercise);
-}
-
-function createSignalPositions(count) {
-    const container = document.getElementById('signalPositions');
-    if (!container) return;
-    
-    container.innerHTML = '';
-    
-    for (let i = 0; i < count; i++) {
-        const position = document.createElement('div');
-        position.className = 'signal-position';
-        position.id = `position-${i}`;
-        position.innerHTML = `
-            <div class="signal-slot" onclick="selectSignalPosition(${i})">
-                <span class="position-number">${i + 1}</span>
-                <div class="signal-display" id="signal-${i}">
-                    <span class="signal-placeholder">?</span>
-                </div>
-            </div>
-            <div class="position-label">Pos. ${i + 1}</div>
-        `;
-        
-        container.appendChild(position);
-    }
-}
-
-function populateSignalGrid() {
-    const grid = document.getElementById('signalGrid');
-    if (!grid || typeof SIGNAL_TYPES === 'undefined') return;
-    
-    const signalTypes = APP_STATE.systemType === 2 ? 
-        Object.values(SIGNAL_TYPES).filter(s => s.aspects === 2) :
-        Object.values(SIGNAL_TYPES).filter(s => s.aspects === 3);
-    
-    grid.innerHTML = signalTypes.map(signal => `
-        <div class="signal-option" data-signal-id="${signal.id}" onclick="selectSignalType('${signal.id}')">
-            <div class="signal-icon" style="background-color: ${signal.color}">
-                ${signal.icon}
-            </div>
-            <div class="signal-name">${signal.name}</div>
-        </div>
-    `).join('');
-}
-
-function setFixedSignals(exercise) {
-    // Primo segnale = partenza (verde)
-    const startSignalType = APP_STATE.systemType === 2 ? 'verde' : 'acc_verde';
-    APP_STATE.userSolution[0] = startSignalType;
-    updateSignalDisplay(0, startSignalType);
-    
-    // Ultimo segnale = arrivo (rosso)
-    const endSignalType = APP_STATE.systemType === 2 ? 'rosso' : 'acc_rosso';
-    const lastIndex = exercise.signalCount - 1;
-    APP_STATE.userSolution[lastIndex] = endSignalType;
-    updateSignalDisplay(lastIndex, endSignalType);
-    
-    // Disabilita modifica per primo e ultimo
-    document.getElementById(`signal-${0}`).classList.add('fixed-signal');
-    document.getElementById(`signal-${lastIndex}`).classList.add('fixed-signal');
+    document.body.appendChild(container);
 }
 
 /**
  * ==========================================
- * GESTIONE INTERAZIONE UTENTE
+ * GESTIONE SEGNALI
  * ==========================================
  */
 
-let selectedPosition = null;
-
-function selectSignalPosition(position) {
-    // Non permette selezione per segnali fissi
-    if (position === 0 || position === APP_STATE.currentExercise.signalCount - 1) {
-        return;
+function loadSignalTypes() {
+    // Carica tipi di segnali dal modulo signals.js
+    if (typeof loadSignalTypes === 'function') {
+        APP_STATE.signalTypes = loadSignalTypes();
+    } else if (typeof SIGNAL_TYPES !== 'undefined') {
+        APP_STATE.signalTypes = SIGNAL_TYPES;
+    } else {
+        console.warn('⚠️ Tipi di segnali non disponibili');
+        APP_STATE.signalTypes = {};
     }
     
-    // Deseleziona posizione precedente
-    if (selectedPosition !== null) {
-        document.getElementById(`position-${selectedPosition}`).classList.remove('selected');
-    }
-    
-    // Seleziona nuova posizione
-    selectedPosition = position;
-    document.getElementById(`position-${position}`).classList.add('selected');
-    
-    console.log(`📍 Posizione ${position + 1} selezionata`);
+    console.log('📡 Segnali caricati:', Object.keys(APP_STATE.signalTypes).length);
 }
 
-function selectSignalType(signalId) {
-    if (selectedPosition === null) {
-        alert('⚠️ Seleziona prima una posizione sul binario!');
-        return;
-    }
+function renderSignalGrid(signals, container) {
+    if (!container) return;
     
-    // Aggiorna soluzione utente
-    APP_STATE.userSolution[selectedPosition] = signalId;
-    
-    // Aggiorna visualizzazione
-    updateSignalDisplay(selectedPosition, signalId);
-    
-    // Deseleziona posizione
-    document.getElementById(`position-${selectedPosition}`).classList.remove('selected');
-    selectedPosition = null;
-    
-    console.log(`🚦 Segnale ${signalId} posizionato in posizione ${selectedPosition + 1}`);
+    container.innerHTML = signals.map(signal => `
+        <div class="signal-item" 
+             data-signal="${signal.id}"
+             data-state="none"
+             onclick="toggleSignalState(this, '${signal.id}')">
+            <div class="signal-light red"></div>
+            <div class="signal-light yellow" style="display: none;"></div>
+            <div class="signal-light green"></div>
+            <div class="signal-label">${signal.name}</div>
+        </div>
+    `).join('');
 }
 
-function updateSignalDisplay(position, signalId) {
-    const display = document.getElementById(`signal-${position}`);
-    if (!display || typeof SIGNAL_TYPES === 'undefined') return;
+function toggleSignalState(element, signalId) {
+    const currentState = element.dataset.state;
+    const signal = APP_STATE.signalTypes[signalId];
     
-    const signal = Object.values(SIGNAL_TYPES).find(s => s.id === signalId);
     if (!signal) return;
     
-    display.innerHTML = `
-        <div class="signal-icon" style="background-color: ${signal.color}">
-            ${signal.icon}
+    let newState;
+    if (signal.aspects === 2) {
+        // Segnale 2 aspetti: rosso ↔ verde
+        newState = currentState === 'red' ? 'green' : 'red';
+    } else {
+        // Segnale 3 aspetti: rosso → giallo → verde → rosso
+        switch (currentState) {
+            case 'none':
+            case 'red': newState = 'yellow'; break;
+            case 'yellow': newState = 'green'; break;
+            case 'green': newState = 'red'; break;
+        }
+    }
+    
+    updateSignalDisplay(element, newState);
+    updateSelectedSignals(signalId, newState);
+}
+
+function updateSignalDisplay(element, state) {
+    element.dataset.state = state;
+    
+    const lights = element.querySelectorAll('.signal-light');
+    lights.forEach(light => light.style.display = 'none');
+    
+    if (state !== 'none') {
+        const activeLight = element.querySelector(`.signal-light.${state}`);
+        if (activeLight) {
+            activeLight.style.display = 'block';
+        }
+    }
+    
+    // Feedback visivo
+    element.classList.remove('signal-correct', 'signal-wrong');
+    element.classList.add('signal-active');
+}
+
+function updateSelectedSignals(signalId, state) {
+    const existingIndex = APP_STATE.selectedSignals.findIndex(s => s.id === signalId);
+    
+    if (existingIndex >= 0) {
+        if (state === 'none') {
+            APP_STATE.selectedSignals.splice(existingIndex, 1);
+        } else {
+            APP_STATE.selectedSignals[existingIndex].state = state;
+        }
+    } else if (state !== 'none') {
+        APP_STATE.selectedSignals.push({ id: signalId, state: state });
+    }
+    
+    console.log('🎯 Segnali selezionati:', APP_STATE.selectedSignals);
+}
+
+/**
+ * ==========================================
+ * SISTEMA ESERCIZI
+ * ==========================================
+ */
+
+function loadDefaultExercises() {
+    // Esercizi predefiniti per il sistema classico
+    const exercises = [
+        {
+            id: 'basic_2aspect',
+            name: 'Segnali Base 2 Aspetti',
+            description: 'Imposta i segnali per permettere il transito',
+            signals: ['SE_BASE', 'SE_PROTEZIONE'],
+            solution: [
+                { id: 'SE_BASE', state: 'green' },
+                { id: 'SE_PROTEZIONE', state: 'green' }
+            ],
+            difficulty: 1
+        },
+        {
+            id: 'advanced_3aspect',
+            name: 'Segnali Avanzati 3 Aspetti',
+            description: 'Configura il percorso con limitazione di velocità',
+            signals: ['SE_AVANZATO', 'SE_RIPETITORE'],
+            solution: [
+                { id: 'SE_AVANZATO', state: 'yellow' },
+                { id: 'SE_RIPETITORE', state: 'green' }
+            ],
+            difficulty: 2
+        }
+    ];
+    
+    APP_STATE.exercises = exercises;
+    APP_STATE.currentExercise = exercises[0];
+    
+    renderCurrentExercise();
+}
+
+function renderCurrentExercise() {
+    if (!APP_STATE.currentExercise) return;
+    
+    const exercise = APP_STATE.currentExercise;
+    const container = document.getElementById('signalGrid');
+    
+    if (container) {
+        const exerciseSignals = exercise.signals.map(id => 
+            APP_STATE.signalTypes[id]).filter(Boolean);
+        renderSignalGrid(exerciseSignals, container);
+    }
+    
+    // Aggiorna titolo e descrizione
+    updateExerciseInfo(exercise);
+}
+
+function updateExerciseInfo(exercise) {
+    const title = document.querySelector('.exercise-header h2');
+    const description = document.querySelector('.exercise-description');
+    
+    if (title) {
+        title.textContent = `🚦 ${exercise.name}`;
+    }
+    
+    if (description) {
+        description.textContent = exercise.description;
+    }
+}
+
+/**
+ * ==========================================
+ * VERIFICA SOLUZIONI
+ * ==========================================
+ */
+
+function checkSolution() {
+    if (!APP_STATE.currentExercise) {
+        showFeedback('Nessun esercizio caricato', 'error');
+        return;
+    }
+    
+    const exercise = APP_STATE.currentExercise;
+    const solution = exercise.solution;
+    const selected = APP_STATE.selectedSignals;
+    
+    // Verifica completezza
+    if (selected.length !== solution.length) {
+        showFeedback(`Configurazione incompleta. Richiesti ${solution.length} segnali, configurati ${selected.length}`, 'warning');
+        return;
+    }
+    
+    // Verifica correttezza
+    let correct = 0;
+    const feedback = [];
+    
+    solution.forEach(expectedSignal => {
+        const actualSignal = selected.find(s => s.id === expectedSignal.id);
+        
+        if (!actualSignal) {
+            feedback.push(`❌ Segnale ${expectedSignal.id} non configurato`);
+        } else if (actualSignal.state !== expectedSignal.state) {
+            feedback.push(`❌ Segnale ${expectedSignal.id}: atteso ${expectedSignal.state}, trovato ${actualSignal.state}`);
+        } else {
+            feedback.push(`✅ Segnale ${expectedSignal.id}: corretto`);
+            correct++;
+        }
+    });
+    
+    // Mostra risultato
+    if (correct === solution.length) {
+        showFeedback('🎉 Soluzione corretta! Esercizio completato.', 'success');
+        markExerciseCompleted(exercise.id);
+    } else {
+        showFeedback(feedback.join('<br>'), 'error');
+        highlightSignalErrors(solution, selected);
+    }
+}
+
+function showFeedback(message, type) {
+    const feedbackElement = document.getElementById('exerciseFeedback');
+    if (!feedbackElement) return;
+    
+    feedbackElement.innerHTML = `
+        <div class="feedback-message ${type}">
+            ${message}
         </div>
     `;
-    display.classList.add('filled');
+    
+    // Auto-hide dopo 5 secondi per successo
+    if (type === 'success') {
+        setTimeout(() => {
+            feedbackElement.innerHTML = '';
+        }, 5000);
+    }
+}
+
+function highlightSignalErrors(solution, selected) {
+    solution.forEach(expectedSignal => {
+        const actualSignal = selected.find(s => s.id === expectedSignal.id);
+        const signalElement = document.querySelector(`[data-signal="${expectedSignal.id}"]`);
+        
+        if (signalElement) {
+            if (!actualSignal || actualSignal.state !== expectedSignal.state) {
+                signalElement.classList.add('signal-wrong');
+            } else {
+                signalElement.classList.add('signal-correct');
+            }
+        }
+    });
+}
+
+function markExerciseCompleted(exerciseId) {
+    // Salva progresso in localStorage
+    let completed = JSON.parse(localStorage.getItem('rfi_completed_exercises') || '[]');
+    if (!completed.includes(exerciseId)) {
+        completed.push(exerciseId);
+        localStorage.setItem('rfi_completed_exercises', JSON.stringify(completed));
+    }
+    
+    updateExerciseStats();
+}
+
+function updateExerciseStats() {
+    const completed = JSON.parse(localStorage.getItem('rfi_completed_exercises') || '[]');
+    const total = APP_STATE.exercises ? APP_STATE.exercises.length : 0;
+    
+    const exerciseCount = document.getElementById('exerciseCount');
+    const completedCount = document.getElementById('completedCount');
+    
+    if (exerciseCount) {
+        exerciseCount.textContent = `${total} esercizi`;
+    }
+    
+    if (completedCount) {
+        completedCount.textContent = `${completed.length} completati`;
+    }
 }
 
 /**
@@ -424,172 +377,167 @@ function updateSignalDisplay(position, signalId) {
  * ==========================================
  */
 
-function checkSolution() {
-    const solution = APP_STATE.userSolution;
-    const emptyPositions = solution.filter(s => s === null).length;
-    
-    if (emptyPositions > 0) {
-        alert(`⚠️ Completa tutti i segnali! Mancano ${emptyPositions} posizioni.`);
-        return;
-    }
-    
-    // Per ora mostra solo un messaggio di conferma
-    // In futuro si potrebbe implementare una logica di validazione
-    alert('✅ Soluzione completata! (Non ci sono risposte "corrette" predefinite)');
-    
-    console.log('✅ Soluzione verificata:', solution);
-}
-
 function resetExercise() {
-    if (confirm('🔄 Vuoi ricominciare l\'esercizio?')) {
-        initializeExercise(APP_STATE.currentExercise);
-        selectedPosition = null;
+    APP_STATE.selectedSignals = [];
+    
+    // Reset visuale segnali
+    document.querySelectorAll('.signal-item').forEach(item => {
+        item.dataset.state = 'none';
+        item.classList.remove('signal-active', 'signal-correct', 'signal-wrong');
+        item.querySelectorAll('.signal-light').forEach(light => {
+            light.style.display = 'none';
+        });
+    });
+    
+    // Pulisci feedback
+    const feedbackElement = document.getElementById('exerciseFeedback');
+    if (feedbackElement) {
+        feedbackElement.innerHTML = '';
     }
+    
+    showFeedback('Esercizio resettato', 'info');
 }
 
-function saveSolution() {
-    const solution = APP_STATE.userSolution;
-    const emptyPositions = solution.filter(s => s === null).length;
+function showHint() {
+    if (!APP_STATE.currentExercise) return;
     
-    if (emptyPositions > 0) {
-        alert('⚠️ Completa prima tutti i segnali per salvare!');
-        return;
-    }
-    
-    const userName = prompt('👤 Il tuo nome:', 'Anonimo') || 'Anonimo';
-    
-    const solutionData = {
-        id: generateSolutionId(),
-        railwayId: APP_STATE.currentExercise.railway.id,
-        railwayName: APP_STATE.currentExercise.railway.name,
-        startSignal: APP_STATE.currentExercise.startSignal.id,
-        endSignal: APP_STATE.currentExercise.endSignal.id,
-        solution: [...solution],
-        systemType: APP_STATE.systemType,
-        userName: userName,
-        timestamp: new Date().toISOString(),
-        exercise: APP_STATE.currentExercise
+    const exercise = APP_STATE.currentExercise;
+    const hints = {
+        'basic_2aspect': 'Imposta entrambi i segnali su verde per permettere il transito normale.',
+        'advanced_3aspect': 'Usa il giallo per indicare limitazione di velocità, verde per via libera.'
     };
     
-    // Salva nel localStorage
-    saveSolutionToDatabase(solutionData);
-    
-    alert(`💾 Soluzione di ${userName} salvata con successo!`);
-    console.log('💾 Soluzione salvata:', solutionData);
+    const hint = hints[exercise.id] || 'Consulta il manuale RFI per le configurazioni corrette.';
+    showFeedback(`💡 Suggerimento: ${hint}`, 'info');
 }
 
-function showOtherSolutions() {
-    const exercise = APP_STATE.currentExercise;
-    const solutions = getSolutionsForExercise(exercise.railway.id, exercise.startSignal.id, exercise.endSignal.id);
+/**
+ * ==========================================
+ * INTEGRAZIONE CON EDITOR MODERNO
+ * ==========================================
+ */
+
+function switchToEditor() {
+    // Passa dalla modalità esercizi all'editor moderno
+    APP_STATE.currentMode = 'editor';
     
-    if (solutions.length === 0) {
-        alert('📋 Nessuna altra soluzione trovata per questo percorso.');
-        return;
+    // Nasconde interfaccia esercizi
+    const exerciseContainer = document.querySelector('.signal-exercise');
+    if (exerciseContainer) {
+        exerciseContainer.style.display = 'none';
     }
     
-    displaySolutionsComparison(solutions);
+    // Attiva editor se non già attivo
+    if (typeof initializeRailwayEditor === 'function') {
+        initializeRailwayEditor();
+    }
+    
+    console.log('🔄 Passaggio alla modalità Editor');
 }
 
-function backToRailwaySelection() {
-    if (confirm('🔙 Tornare alla selezione della linea? (Il progresso andrà perso)')) {
-        APP_STATE.currentMode = 'play';
-        APP_STATE.isExerciseActive = false;
-        APP_STATE.currentExercise = null;
-        
-        // Torna all'interfaccia di gioco
-        if (typeof switchEditorMode === 'function') {
-            switchEditorMode('play');
+function switchToExercises() {
+    // Passa dall'editor alla modalità esercizi
+    APP_STATE.currentMode = 'exercises';
+    
+    // Mostra interfaccia esercizi
+    const exerciseContainer = document.querySelector('.signal-exercise');
+    if (exerciseContainer) {
+        exerciseContainer.style.display = 'block';
+    }
+    
+    // Nasconde editor
+    const editorContainer = document.querySelector('.modern-editor-layout');
+    if (editorContainer) {
+        editorContainer.style.display = 'none';
+    }
+    
+    console.log('🔄 Passaggio alla modalità Esercizi');
+}
+
+/**
+ * ==========================================
+ * COMPATIBILITÀ E UTILITY
+ * ==========================================
+ */
+
+function bindExerciseEvents() {
+    // Event delegation per elementi dinamici
+    document.addEventListener('click', function(e) {
+        if (e.target.matches('.next-exercise')) {
+            loadNextExercise();
+        } else if (e.target.matches('.prev-exercise')) {
+            loadPrevExercise();
+        } else if (e.target.matches('.exercise-selector')) {
+            selectExercise(e.target.dataset.exerciseId);
         }
+    });
+}
+
+function loadNextExercise() {
+    if (!APP_STATE.exercises || !APP_STATE.currentExercise) return;
+    
+    const currentIndex = APP_STATE.exercises.findIndex(ex => ex.id === APP_STATE.currentExercise.id);
+    const nextIndex = (currentIndex + 1) % APP_STATE.exercises.length;
+    
+    APP_STATE.currentExercise = APP_STATE.exercises[nextIndex];
+    renderCurrentExercise();
+    resetExercise();
+}
+
+function loadPrevExercise() {
+    if (!APP_STATE.exercises || !APP_STATE.currentExercise) return;
+    
+    const currentIndex = APP_STATE.exercises.findIndex(ex => ex.id === APP_STATE.currentExercise.id);
+    const prevIndex = currentIndex === 0 ? APP_STATE.exercises.length - 1 : currentIndex - 1;
+    
+    APP_STATE.currentExercise = APP_STATE.exercises[prevIndex];
+    renderCurrentExercise();
+    resetExercise();
+}
+
+function selectExercise(exerciseId) {
+    if (!APP_STATE.exercises) return;
+    
+    const exercise = APP_STATE.exercises.find(ex => ex.id === exerciseId);
+    if (exercise) {
+        APP_STATE.currentExercise = exercise;
+        renderCurrentExercise();
+        resetExercise();
     }
 }
 
 /**
  * ==========================================
- * DATABASE SOLUZIONI
+ * API PER INTEROPERABILITÀ
  * ==========================================
  */
 
-function saveSolutionToDatabase(solutionData) {
-    let solutions = JSON.parse(localStorage.getItem('rfi_signal_solutions') || '[]');
-    solutions.push(solutionData);
-    localStorage.setItem('rfi_signal_solutions', JSON.stringify(solutions));
-}
-
-function getSolutionsForExercise(railwayId, startSignalId, endSignalId) {
-    const solutions = JSON.parse(localStorage.getItem('rfi_signal_solutions') || '[]');
-    return solutions.filter(sol => 
-        sol.railwayId === railwayId && 
-        sol.startSignal === startSignalId && 
-        sol.endSignal === endSignalId
-    );
-}
-
-function displaySolutionsComparison(solutions) {
-    // Crea finestra modale per mostrare soluzioni
-    const modal = document.createElement('div');
-    modal.className = 'solutions-modal';
-    modal.innerHTML = `
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>👥 Altre Soluzioni (${solutions.length})</h3>
-                <button class="close-btn" onclick="this.parentElement.parentElement.parentElement.remove()">✕</button>
-            </div>
-            <div class="solutions-list">
-                ${solutions.map((sol, idx) => `
-                    <div class="solution-item">
-                        <h4>👤 ${sol.userName} - ${new Date(sol.timestamp).toLocaleDateString()}</h4>
-                        <div class="solution-signals">
-                            ${sol.solution.map((signalId, pos) => {
-                                const signal = Object.values(SIGNAL_TYPES).find(s => s.id === signalId);
-                                return signal ? `
-                                    <div class="mini-signal" style="background-color: ${signal.color}">
-                                        ${signal.icon}
-                                    </div>
-                                ` : '<div class="mini-signal">?</div>';
-                            }).join('')}
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-}
-
-function generateSolutionId() {
-    return 'sol_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-}
-
-/**
- * ==========================================
- * UTILITÀ E HELPERS
- * ==========================================
- */
-
-function switchSystemType() {
-    APP_STATE.systemType = APP_STATE.systemType === 2 ? 3 : 2;
-    
-    if (APP_STATE.isExerciseActive) {
-        populateSignalGrid();
-        setFixedSignals(APP_STATE.currentExercise);
-    }
-    
-    console.log(`🔄 Sistema cambiato a ${APP_STATE.systemType} aspetti`);
-}
-
-// Esporta funzioni globali
+// Espone funzioni per l'uso da parte dell'editor o altre parti del sistema
 window.APP_STATE = APP_STATE;
-window.handleSignalSelection = handleSignalSelection;
-window.resetSignalSelection = resetSignalSelection;
-window.startSignalExercise = startSignalExercise;
-window.selectSignalPosition = selectSignalPosition;
-window.selectSignalType = selectSignalType;
+window.toggleSignalState = toggleSignalState;
 window.checkSolution = checkSolution;
 window.resetExercise = resetExercise;
-window.saveSolution = saveSolution;
-window.showOtherSolutions = showOtherSolutions;
-window.backToRailwaySelection = backToRailwaySelection;
-window.switchSystemType = switchSystemType;
+window.showHint = showHint;
+window.switchToEditor = switchToEditor;
+window.switchToExercises = switchToExercises;
 
-console.log('🎮 Main Controller inizializzato'); 
+/**
+ * ==========================================
+ * DEBUG UTILITIES
+ * ==========================================
+ */
+
+function debugMainState() {
+    console.log('🔍 DEBUG APP_STATE:', {
+        currentMode: APP_STATE.currentMode,
+        selectedSignals: APP_STATE.selectedSignals,
+        currentExercise: APP_STATE.currentExercise?.name,
+        totalExercises: APP_STATE.exercises?.length,
+        signalTypesLoaded: Object.keys(APP_STATE.signalTypes).length
+    });
+}
+
+// Espone debug globalmente
+window.debugMain = debugMainState;
+
+console.log('✅ Main.js inizializzato - Sistema RFI pronto'); 
