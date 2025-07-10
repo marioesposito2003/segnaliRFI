@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulatore Segnali RFI</title>
+    <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🚂 Simulatore Segnali RFI</h1>
+            <p class="subtitle">Sistema di Addestramento - 2 e 3 Aspetti</p>
+        </header>
+
+        <!-- Selezione Sistema -->
+        <div class="system-selector">
+            <button class="system-btn active" onclick="switchSystem(2)">
+                📍 Sistema 2 Aspetti
+            </button>
+            <button class="system-btn" onclick="switchSystem(3)">
+                🔺 Sistema 3 Aspetti
+            </button>
+        </div>
+
+        <!-- Header Esercizio -->
+        <div class="exercise-header">
+            <div class="exercise-counter" id="exerciseCounter">
+                Esercizio 1 di 20 (2 aspetti)
+            </div>
+            <div class="difficulty-badge difficulty-facile" id="difficultyBadge">
+                Facile
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
+
+        <!-- Informazioni Esercizio -->
+        <div class="exercise-info">
+            <h3 id="exerciseTitle">Caricamento esercizio...</h3>
+            <p id="exerciseDescription">Preparazione del simulatore...</p>
+            
+            <div class="conditions-section">
+                <h4>📋 Condizioni Operative:</h4>
+                <div class="conditions-grid" id="conditionsGrid">
+                    <!-- Dinamico -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Visualizzazione Binario -->
+        <div class="track-visualization">
+            <div class="track-info" id="trackInfo">
+                Configurazione binario standard
+            </div>
+            <div class="railway-layout" id="railwayLayout">
+                <div class="main-track"></div>
+                <!-- Elementi aggiuntivi inseriti dinamicamente -->
+            </div>
+            <div class="signal-positions" id="signalPositions">
+                <!-- Posizioni segnali generate dinamicamente -->
+            </div>
+        </div>
+
+        <!-- Categorie Segnali -->
+        <div class="signal-categories" id="signalCategories">
+            <!-- Categorie generate dinamicamente -->
+        </div>
+
+        <!-- Controlli -->
+        <div class="controls">
+            <button class="control-btn secondary" onclick="clearAllSignals()">
+                🗑️ Pulisci Tutto
+            </button>
+            <button class="control-btn hint" onclick="showHint()">
+                💡 Suggerimento
+            </button>
+            <button class="control-btn primary" onclick="checkSolution()">
+                ✅ Verifica Soluzione
+            </button>
+            <button class="control-btn next" id="nextBtn" onclick="nextExercise()" style="display: none;">
+                ➡️ Prossimo Esercizio
+            </button>
+        </div>
+
+        <!-- Risultati -->
+        <div class="results" id="results">
+            <h3 id="resultsTitle">Risultati</h3>
+            <div class="results-grid" id="resultsGrid">
+                <!-- Risultati dinamici -->
+            </div>
+            <div class="explanation" id="explanation">
+                <!-- Spiegazione dinamica -->
+            </div>
+        </div>
+
+        <!-- Statistiche -->
+        <div class="stats">
+            <div class="stat-item">
+                <span class="stat-label">Corretti:</span>
+                <span class="stat-value" id="correctCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Totali:</span>
+                <span class="stat-value" id="totalCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Precisione:</span>
+                <span class="stat-value" id="accuracyPercent">0%</span>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>🚂 Simulatore Segnali RFI - Per addestramento</p>
+        </footer>
+    </div>
+
+    <script src="assets/js/signals.js"></script>
+    <script src="assets/js/exercises.js"></script>
+    <script src="assets/js/main.js"></script>
+</body>
+</html> 
