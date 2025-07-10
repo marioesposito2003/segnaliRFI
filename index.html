@@ -3,127 +3,202 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simulatore Segnali RFI</title>
+    <title>Editor Linee Ferroviarie RFI - Sistema Segnali</title>
+    <meta name="description" content="Editor avanzato per costruire linee ferroviarie personalizzate e praticare con il sistema di segnalamento RFI">
+    <link rel="icon" type="image/x-icon" href="assets/images/favicon.ico">
     <link rel="stylesheet" href="assets/css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <header class="header">
-            <h1>🚂 Simulatore Segnali RFI</h1>
-            <p class="subtitle">Sistema di Addestramento - 2 e 3 Aspetti</p>
-        </header>
-
-        <!-- Selezione Sistema -->
-        <div class="system-selector">
-            <button class="system-btn active" onclick="switchSystem(2)">
-                📍 Sistema 2 Aspetti
-            </button>
-            <button class="system-btn" onclick="switchSystem(3)">
-                🔺 Sistema 3 Aspetti
-            </button>
+    <!-- Header principale -->
+    <header class="header">
+        <div class="container">
+            <h1>🏗️ Editor Linee Ferroviarie RFI</h1>
+            <p>Sistema avanzato per costruire e utilizzare linee ferroviarie personalizzate - Segnalamento Italiano</p>
         </div>
+    </header>
 
-        <!-- Header Esercizio -->
-        <div class="exercise-header">
-            <div class="exercise-counter" id="exerciseCounter">
-                Esercizio 1 di 20 (2 aspetti)
-            </div>
-            <div class="difficulty-badge difficulty-facile" id="difficultyBadge">
-                Facile
+    <!-- Container principale -->
+    <main class="container">
+        <!-- Informazioni esercizio/stato -->
+        <div class="exercise-status">
+            <div class="status-header">
+                <span class="exercise-counter" id="exerciseCounter">Editor Linee Ferroviarie</span>
+                <span class="difficulty-badge" id="difficultyBadge">Sistema Personalizzato</span>
             </div>
         </div>
 
-        <!-- Progress Bar -->
-        <div class="progress-container">
-            <div class="progress-bar">
-                <div class="progress-fill" id="progressFill"></div>
-            </div>
-        </div>
-
-        <!-- Informazioni Esercizio -->
+        <!-- Area principale dell'editor -->
         <div class="exercise-info">
-            <h3 id="exerciseTitle">Caricamento esercizio...</h3>
-            <p id="exerciseDescription">Preparazione del simulatore...</p>
-            
-            <div class="conditions-section">
-                <h4>📋 Condizioni Operative:</h4>
-                <div class="conditions-grid" id="conditionsGrid">
-                    <!-- Dinamico -->
-                </div>
+            <!-- Contenuto generato dinamicamente dall'editor -->
+            <div class="loading-message">
+                <h3>🔄 Caricamento Editor...</h3>
+                <p>Inizializzazione sistema linee ferroviarie in corso...</p>
             </div>
         </div>
 
-        <!-- Visualizzazione Binario -->
-        <div class="track-visualization">
-            <div class="track-info" id="trackInfo">
-                Configurazione binario standard
+        <!-- Visualizzazione binario (per modalità esercizio) -->
+        <div class="track-visualization" style="display: none;">
+            <h4>🛤️ Binario da Segnalare</h4>
+            <div class="track-info">
+                <span id="trackInfo">Informazioni percorso</span>
             </div>
             <div class="railway-layout" id="railwayLayout">
                 <div class="main-track"></div>
-                <!-- Elementi aggiuntivi inseriti dinamicamente -->
             </div>
             <div class="signal-positions" id="signalPositions">
                 <!-- Posizioni segnali generate dinamicamente -->
             </div>
         </div>
 
-        <!-- Categorie Segnali -->
-        <div class="signal-categories" id="signalCategories">
-            <!-- Categorie generate dinamicamente -->
+        <!-- Controlli (per modalità esercizio) -->
+        <div class="controls" style="display: none;">
+            <!-- Selezione segnali -->
+            <div class="signal-selection">
+                <h4>🚦 Segnali Disponibili</h4>
+                <div class="system-selector">
+                    <button class="system-btn active" onclick="switchSystemType()">
+                        🔄 Sistema: <span id="currentSystemDisplay">2 aspetti</span>
+                    </button>
+                </div>
+                <div class="signal-categories" id="signalCategories">
+                    <!-- Categorie segnali caricate da signals.js -->
+                </div>
+            </div>
+
+            <!-- Pulsanti controllo -->
+            <div class="control-buttons">
+                <button class="control-btn primary" onclick="checkSolution()">
+                    ✅ Verifica Soluzione
+                </button>
+                <button class="control-btn secondary" onclick="resetExercise()">
+                    🔄 Reset Esercizio
+                </button>
+                <button class="control-btn" onclick="saveSolution()">
+                    💾 Salva Soluzione
+                </button>
+                <button class="control-btn hint" onclick="showOtherSolutions()">
+                    👥 Altre Soluzioni
+                </button>
+            </div>
         </div>
 
-        <!-- Controlli -->
-        <div class="controls">
-            <button class="control-btn secondary" onclick="clearAllSignals()">
-                🗑️ Pulisci Tutto
-            </button>
-            <button class="control-btn hint" onclick="showHint()">
-                💡 Suggerimento
-            </button>
-            <button class="control-btn primary" onclick="checkSolution()">
-                ✅ Verifica Soluzione
-            </button>
-            <button class="control-btn next" id="nextBtn" onclick="nextExercise()" style="display: none;">
-                ➡️ Prossimo Esercizio
-            </button>
-        </div>
-
-        <!-- Risultati -->
+        <!-- Risultati e spiegazioni -->
         <div class="results" id="results">
             <h3 id="resultsTitle">Risultati</h3>
             <div class="results-grid" id="resultsGrid">
-                <!-- Risultati dinamici -->
+                <!-- Risultati della verifica -->
             </div>
             <div class="explanation" id="explanation">
-                <!-- Spiegazione dinamica -->
+                <!-- Spiegazioni dettagliate -->
             </div>
         </div>
 
-        <!-- Statistiche -->
-        <div class="stats">
-            <div class="stat-item">
-                <span class="stat-label">Corretti:</span>
-                <span class="stat-value" id="correctCount">0</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label">Totali:</span>
-                <span class="stat-value" id="totalCount">0</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label">Precisione:</span>
-                <span class="stat-value" id="accuracyPercent">0%</span>
+        <!-- Progressi e statistiche -->
+        <div class="progress-container" style="display: none;">
+            <div class="progress-info">
+                <h4>📊 Progressi Sessione</h4>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">Linee Create:</span>
+                        <span class="stat-value" id="createdRailways">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Esercizi Completati:</span>
+                        <span class="stat-value" id="completedExercises">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Soluzioni Salvate:</span>
+                        <span class="stat-value" id="savedSolutions">0</span>
+                    </div>
+                </div>
             </div>
         </div>
+    </main>
 
-        <!-- Footer -->
-        <footer class="footer">
-            <p>🚂 Simulatore Segnali RFI - Per addestramento</p>
-        </footer>
-    </div>
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>🏗️ Editor Linee Ferroviarie RFI</h4>
+                    <p>Sistema avanzato per costruzione e simulazione linee ferroviarie personalizzate</p>
+                </div>
+                <div class="footer-section">
+                    <h4>🔧 Funzionalità</h4>
+                    <ul>
+                        <li>Editor drag & drop</li>
+                        <li>Canvas con griglia</li>
+                        <li>Elementi ferroviari completi</li>
+                        <li>Database condiviso</li>
+                        <li>Sistema segnali RFI</li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>📚 Supporto</h4>
+                    <ul>
+                        <li>2 e 3 aspetti</li>
+                        <li>Export/Import database</li>
+                        <li>Soluzioni collaborative</li>
+                        <li>Design responsive</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Sistema Editor Linee Ferroviarie RFI - Strumento per formazione e simulazione</p>
+                <p>🚂 Versione avanzata con editor personalizzato e database condiviso</p>
+            </div>
+        </div>
+    </footer>
 
+    <!-- Scripts -->
     <script src="assets/js/signals.js"></script>
     <script src="assets/js/exercises.js"></script>
     <script src="assets/js/main.js"></script>
+
+    <!-- Script di inizializzazione -->
+    <script>
+        // Funzione di inizializzazione globale
+        window.addEventListener('load', function() {
+            console.log('🚀 Inizializzazione completata');
+            
+            // Rimuove messaggio di caricamento dopo inizializzazione
+            setTimeout(() => {
+                const loadingMsg = document.querySelector('.loading-message');
+                if (loadingMsg && typeof initializeRailwayEditor === 'function') {
+                    loadingMsg.style.display = 'none';
+                }
+            }, 1000);
+        });
+
+        // Gestione errori JavaScript
+        window.addEventListener('error', function(e) {
+            console.error('❌ Errore JavaScript:', e.error);
+            const loadingMsg = document.querySelector('.loading-message');
+            if (loadingMsg) {
+                loadingMsg.innerHTML = `
+                    <h3>❌ Errore di Caricamento</h3>
+                    <p>Si è verificato un errore durante l'inizializzazione.</p>
+                    <button onclick="location.reload()" class="control-btn primary">🔄 Ricarica Pagina</button>
+                `;
+            }
+        });
+
+        // Debug utilities
+        window.debugEditor = function() {
+            return {
+                railwayEditor: window.RAILWAY_EDITOR,
+                appState: window.APP_STATE,
+                elements: window.RAILWAY_ELEMENTS,
+                customRailways: JSON.parse(localStorage.getItem('rfi_custom_railways') || '[]'),
+                solutions: JSON.parse(localStorage.getItem('rfi_signal_solutions') || '[]')
+            };
+        };
+
+        console.log('🏗️ Editor Linee Ferroviarie RFI caricato');
+        console.log('🔧 Usa window.debugEditor() per informazioni di debug');
+    </script>
 </body>
 </html> 

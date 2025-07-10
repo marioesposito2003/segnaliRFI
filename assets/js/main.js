@@ -1,22 +1,18 @@
 /**
- * SIMULATORE SEGNALI RFI - LOGICA PRINCIPALE
- * ==========================================
- * Gestione completa dell'interfaccia e della logica di gioco
+ * MAIN CONTROLLER - EDITOR LINEE FERROVIARIE RFI
+ * ==============================================
+ * Sistema per costruire e utilizzare linee ferroviarie personalizzate
  */
 
-// Variabili globali dello stato dell'applicazione
-let currentSystem = 2; // 2 = sistema 2 aspetti, 3 = sistema 3 aspetti
-let currentExerciseIndex = 0;
-let currentExercise = null;
-let currentExercises = [];
-let selectedPosition = null;
-let selectedSignal = null;
-let userSolution = [];
-let isChecked = false;
-let stats = {
-    correct: 0,
-    total: 0,
-    hints: 0
+// Stato globale dell'applicazione
+const APP_STATE = {
+    currentMode: 'build', // 'build' o 'play' o 'exercise'
+    selectedStartSignal: null,
+    selectedEndSignal: null,
+    currentExercise: null,
+    userSolution: [],
+    systemType: 2, // 2 aspetti o 3 aspetti
+    isExerciseActive: false
 };
 
 /**
@@ -25,610 +21,575 @@ let stats = {
  * ==========================================
  */
 
-// Inizializzazione quando il DOM è caricato
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚂 Inizializzazione Simulatore Segnali RFI...');
+    console.log('🚀 Avvio Editor Linee Ferroviarie RFI');
     
-    // Verifica che tutti i dati siano caricati
-    if (typeof SIGNAL_TYPES === 'undefined' || typeof EXERCISES_2_ASPECT === 'undefined' || typeof TRACK_CONFIGS === 'undefined') {
-        console.log('⏳ Attendo caricamento dati...');
-        setTimeout(() => {
-            document.dispatchEvent(new Event('DOMContentLoaded'));
-        }, 100);
-        return;
+    // Carica tipi di segnali
+    if (typeof loadSignalTypes === 'function') {
+        loadSignalTypes();
     }
     
-    initializeApp();
+    // Inizializza editor
+    if (typeof initializeRailwayEditor === 'function') {
+        initializeRailwayEditor();
+    }
+    
+    console.log('✅ Applicazione inizializzata');
 });
 
-function initializeApp() {
-    console.log('📊 Dati caricati, inizializzazione in corso...');
-    
-    // Inizializza sistema 2 aspetti come default
-    currentExercises = EXERCISES_2_ASPECT;
-    
-    // Crea interfaccia
-    createSignalGrids();
-    updateStats();
-    
-    // Carica primo esercizio
-    loadExercise(0);
-    
-    console.log('✅ Simulatore inizializzato correttamente');
-}
-
 /**
  * ==========================================
- * GESTIONE SISTEMI (2/3 ASPETTI)
+ * GESTIONE MODALITÀ GIOCO - SELEZIONE SEGNALI
  * ==========================================
  */
 
-function switchSystem(system) {
-    currentSystem = system;
-    currentExerciseIndex = 0;
-    currentExercises = system === 2 ? EXERCISES_2_ASPECT : EXERCISES_3_ASPECT;
-    
-    // Aggiorna pulsanti del sistema
-    document.querySelectorAll('.system-btn').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    
-    // Attiva il pulsante corretto
-    const buttons = document.querySelectorAll('.system-btn');
-    if (system === 2 && buttons[0]) {
-        buttons[0].classList.add('active');
-    } else if (system === 3 && buttons[1]) {
-        buttons[1].classList.add('active');
-    }
-    
-    // Ricrea interfaccia
-    createSignalGrids();
-    loadExercise(0);
-    
-    console.log(`🔄 Cambiato a sistema ${system} aspetti`);
-}
-
-/**
- * ==========================================
- * GESTIONE INTERFACCIA SEGNALI
- * ==========================================
- */
-
-function createSignalGrids() {
-    const container = document.getElementById('signalCategories');
-    if (!container) return;
-    
-    container.innerHTML = '';
-
-    if (currentSystem === 2) {
-        // Sistema 2 aspetti: Prima Categoria + Avviso
-        const primaCategory = createSignalCategory('🔴 Segnali di Prima Categoria', 'prima_categoria', 2);
-        const avvisoCategory = createSignalCategory('🟡 Segnali di Avviso', 'avviso', 2);
-        
-        container.appendChild(primaCategory);
-        container.appendChild(avvisoCategory);
-    } else {
-        // Sistema 3 aspetti: Solo Accoppiati
-        const accoppiatoCategory = createSignalCategory('🟣 Segnali Accoppiati (3 Aspetti)', 'accoppiato', 3);
-        container.appendChild(accoppiatoCategory);
-    }
-}
-
-function createSignalCategory(title, category, system) {
-    const categoryDiv = document.createElement('div');
-    categoryDiv.className = 'signal-category';
-    
-    const titleElement = document.createElement('h4');
-    titleElement.textContent = title;
-    categoryDiv.appendChild(titleElement);
-    
-    const gridDiv = document.createElement('div');
-    gridDiv.className = 'signal-grid';
-    
-    const signals = Object.values(SIGNAL_TYPES).filter(s => 
-        s.category === category && s.system === system
-    );
-    
-    signals.forEach(signal => {
-        const option = createSignalOption(signal);
-        gridDiv.appendChild(option);
-    });
-    
-    categoryDiv.appendChild(gridDiv);
-    return categoryDiv;
-}
-
-function createSignalOption(signal) {
-    const option = document.createElement('div');
-    option.className = 'signal-option';
-    option.dataset.signalId = signal.id;
-    option.title = `${signal.name} - ${signal.meaning}`;
-    
-    const icon = document.createElement('div');
-    icon.className = `signal-option-icon ${signal.class}`;
-    icon.textContent = signal.icon;
-    
-    const name = document.createElement('div');
-    name.className = 'signal-option-name';
-    name.textContent = signal.name;
-    
-    option.appendChild(icon);
-    option.appendChild(name);
-    
-    option.addEventListener('click', () => selectSignal(signal.id));
-    
-    return option;
-}
-
-/**
- * ==========================================
- * GESTIONE ESERCIZI
- * ==========================================
- */
-
-function loadExercise(index) {
-    if (index >= currentExercises.length) {
-        showCompletionMessage();
+function handleSignalSelection(element) {
+    if (element.type !== 'signal') {
+        console.log('⚠️ Elemento selezionato non è un segnale');
         return;
     }
+    
+    if (!APP_STATE.selectedStartSignal) {
+        // Primo click = segnale di partenza (verde)
+        APP_STATE.selectedStartSignal = element;
+        element.data.color = '#27ae60'; // Verde
+        updateSignalVisual(element, 'start');
+        
+        console.log('🟢 Segnale di partenza selezionato:', element.id);
+        
+    } else if (!APP_STATE.selectedEndSignal && element !== APP_STATE.selectedStartSignal) {
+        // Secondo click = segnale di arrivo (rosso)
+        APP_STATE.selectedEndSignal = element;
+        element.data.color = '#e74c3c'; // Rosso
+        updateSignalVisual(element, 'end');
+        
+        console.log('🔴 Segnale di arrivo selezionato:', element.id);
+        
+        // Mostra pulsante per iniziare esercizio
+        showStartExerciseButton();
+        
+    } else {
+        // Reset se clicca su segnali già selezionati
+        resetSignalSelection();
+    }
+    
+    // Ridisegna canvas
+    if (typeof redrawCanvas === 'function') {
+        redrawCanvas();
+    }
+}
 
-    currentExerciseIndex = index;
-    currentExercise = currentExercises[index];
+function updateSignalVisual(element, type) {
+    if (type === 'start') {
+        element.data.icon = '🟢';
+        element.data.name = 'PARTENZA';
+    } else if (type === 'end') {
+        element.data.icon = '🔴';
+        element.data.name = 'ARRIVO';
+    }
+}
+
+function resetSignalSelection() {
+    // Reset visuale segnali
+    if (APP_STATE.selectedStartSignal) {
+        APP_STATE.selectedStartSignal.data.color = '#ddd';
+        APP_STATE.selectedStartSignal.data.icon = '⚪';
+        APP_STATE.selectedStartSignal.data.name = 'Segnale Vuoto';
+    }
+    
+    if (APP_STATE.selectedEndSignal) {
+        APP_STATE.selectedEndSignal.data.color = '#ddd';
+        APP_STATE.selectedEndSignal.data.icon = '⚪';
+        APP_STATE.selectedEndSignal.data.name = 'Segnale Vuoto';
+    }
     
     // Reset stato
-    selectedPosition = null;
-    selectedSignal = null;
-    userSolution = new Array(currentExercise.positions).fill(null);
-    isChecked = false;
+    APP_STATE.selectedStartSignal = null;
+    APP_STATE.selectedEndSignal = null;
     
-    // Aggiorna interfaccia
-    updateExerciseInfo();
-    updateTrackVisualization();
-    createSignalPositions();
-    hideResults();
-    updateProgress();
+    // Nasconde pulsante esercizio
+    document.getElementById('startExerciseBtn').style.display = 'none';
     
-    console.log(`📋 Caricato esercizio ${index + 1}:`, currentExercise.title);
+    // Ridisegna canvas
+    if (typeof redrawCanvas === 'function') {
+        redrawCanvas();
+    }
+    
+    console.log('🔄 Selezione segnali resettata');
 }
 
-function updateExerciseInfo() {
-    // Controllo di sicurezza
-    if (!currentExercise) {
-        console.log('⚠️ Esercizio non ancora caricato');
+function showStartExerciseButton() {
+    const btn = document.getElementById('startExerciseBtn');
+    if (btn) {
+        btn.style.display = 'block';
+        btn.innerHTML = `🚀 Esercizio: ${APP_STATE.selectedStartSignal.id} → ${APP_STATE.selectedEndSignal.id}`;
+    }
+}
+
+/**
+ * ==========================================
+ * AVVIO ESERCIZIO SEGNALI
+ * ==========================================
+ */
+
+function startSignalExercise() {
+    if (!APP_STATE.selectedStartSignal || !APP_STATE.selectedEndSignal) {
+        alert('⚠️ Seleziona prima un segnale di partenza e uno di arrivo!');
         return;
     }
     
-    const counterEl = document.getElementById('exerciseCounter');
-    const difficultyEl = document.getElementById('difficultyBadge');
-    const titleEl = document.getElementById('exerciseTitle');
-    const descriptionEl = document.getElementById('exerciseDescription');
-    const conditionsGrid = document.getElementById('conditionsGrid');
+    console.log('🚀 Avvio esercizio segnali');
     
-    if (counterEl) {
-        counterEl.textContent = `Esercizio ${currentExerciseIndex + 1} di ${currentExercises.length} (${currentSystem} aspetti)`;
-    }
+    // Prepara esercizio
+    const exercise = createExerciseFromRailway();
     
-    if (difficultyEl) {
-        difficultyEl.textContent = currentExercise.difficulty.charAt(0).toUpperCase() + currentExercise.difficulty.slice(1);
-        difficultyEl.className = `difficulty-badge difficulty-${currentExercise.difficulty}`;
-    }
-    
-    if (titleEl) titleEl.textContent = currentExercise.title;
-    if (descriptionEl) descriptionEl.textContent = currentExercise.description;
-    
-    if (conditionsGrid) {
-        conditionsGrid.innerHTML = '';
-        currentExercise.conditions.forEach(condition => {
-            const conditionItem = document.createElement('div');
-            conditionItem.className = 'condition-item';
-            conditionItem.textContent = condition;
-            conditionsGrid.appendChild(conditionItem);
-        });
-    }
-}
-
-function updateTrackVisualization() {
-    // Controllo di sicurezza
-    if (!currentExercise) {
-        console.log('⚠️ Esercizio non disponibile per visualizzazione tracciato');
+    if (!exercise) {
+        alert('❌ Errore nella creazione dell\'esercizio');
         return;
     }
     
-    const trackInfo = document.getElementById('trackInfo');
-    const railwayLayout = document.getElementById('railwayLayout');
+    // Cambia modalità a esercizio
+    APP_STATE.currentMode = 'exercise';
+    APP_STATE.currentExercise = exercise;
+    APP_STATE.isExerciseActive = true;
     
-    if (trackInfo) {
-        trackInfo.textContent = TRACK_CONFIGS[currentExercise.trackConfig] || 'Configurazione standard';
-    }
-    
-    if (railwayLayout) {
-        // Rimuovi elementi tracciato precedenti
-        const existingElements = railwayLayout.querySelectorAll('.deviation-track, .tronchino-track');
-        existingElements.forEach(el => el.remove());
-        
-        // Aggiungi elementi specifici per tipo tracciato
-        if (currentExercise.trackConfig === 'deviation' || 
-            currentExercise.trackConfig === 'av_deviation' ||
-            currentExercise.trackConfig.includes('deviation')) {
-            const deviationTrack = document.createElement('div');
-            deviationTrack.className = 'deviation-track';
-            railwayLayout.appendChild(deviationTrack);
-        }
-        
-        if (currentExercise.trackConfig === 'tronchino' || 
-            currentExercise.trackConfig === 'maintenance_depot') {
-            const tronchinoTrack = document.createElement('div');
-            tronchinoTrack.className = 'tronchino-track';
-            railwayLayout.appendChild(tronchinoTrack);
-        }
-    }
+    // Nasconde interfaccia di gioco e mostra interfaccia esercizio
+    showExerciseInterface(exercise);
 }
 
-function createSignalPositions() {
+function createExerciseFromRailway() {
+    const railway = RAILWAY_EDITOR.selectedRailway;
+    if (!railway) return null;
+    
+    // Filtra solo i segnali dalla linea
+    const signals = railway.elements.filter(el => el.type === 'signal');
+    
+    if (signals.length < 2) {
+        alert('⚠️ La linea deve avere almeno 2 segnali!');
+        return null;
+    }
+    
+    // Calcola distanza approssimativa tra partenza e arrivo
+    const distance = calculateDistance(APP_STATE.selectedStartSignal, APP_STATE.selectedEndSignal);
+    
+    // Determina velocità media (parzialmente casuale per varietà)
+    const baseSpeed = 80 + Math.random() * 40; // 80-120 km/h
+    
+    // Calcola complessità
+    const complexity = Math.max(4, Math.min(12, Math.ceil(distance / 100) + signals.length));
+    
+    return {
+        id: 'custom_' + Date.now(),
+        startSignal: APP_STATE.selectedStartSignal,
+        endSignal: APP_STATE.selectedEndSignal,
+        railway: railway,
+        distance: Math.round(distance),
+        averageSpeed: Math.round(baseSpeed),
+        signalCount: complexity,
+        systemType: APP_STATE.systemType,
+        allSignals: signals
+    };
+}
+
+function calculateDistance(signal1, signal2) {
+    // Calcola distanza euclidea e converte in metri (approssimativo)
+    const dx = signal1.x - signal2.x;
+    const dy = signal1.y - signal2.y;
+    const pixelDistance = Math.sqrt(dx * dx + dy * dy);
+    
+    // Converte pixel in metri (1 pixel ≈ 2 metri)
+    return pixelDistance * 2;
+}
+
+/**
+ * ==========================================
+ * INTERFACCIA ESERCIZIO SEGNALI
+ * ==========================================
+ */
+
+function showExerciseInterface(exercise) {
+    const container = document.querySelector('.exercise-info');
+    
+    container.innerHTML = `
+        <div class="exercise-header">
+            <h3>🚦 Esercizio Segnali: ${exercise.railway.name}</h3>
+            <button class="control-btn secondary" onclick="backToRailwaySelection()">
+                ← Torna alla Selezione Linea
+            </button>
+        </div>
+        
+        <div class="exercise-info-grid">
+            <div class="info-item">
+                <span class="info-label">🟢 Partenza:</span>
+                <span class="info-value">${exercise.startSignal.id}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">🔴 Arrivo:</span>
+                <span class="info-value">${exercise.endSignal.id}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">📏 Distanza:</span>
+                <span class="info-value">${exercise.distance}m</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">⚡ Velocità Media:</span>
+                <span class="info-value">${exercise.averageSpeed} km/h</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">🚦 Segnali Richiesti:</span>
+                <span class="info-value">${exercise.signalCount}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">🔄 Sistema:</span>
+                <span class="info-value">${exercise.systemType} aspetti</span>
+            </div>
+        </div>
+        
+        <div class="track-visualization">
+            <h4>🛤️ Binario da Segnalare</h4>
+            <div class="track-container">
+                <div class="signal-positions" id="signalPositions">
+                    <!-- Posizioni segnali generate dinamicamente -->
+                </div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div class="signal-selection">
+                <h4>🚦 Seleziona Tipo Segnale</h4>
+                <div class="signal-grid" id="signalGrid">
+                    <!-- Griglia segnali caricata da signals.js -->
+                </div>
+            </div>
+            
+            <div class="control-buttons">
+                <button class="control-btn primary" onclick="checkSolution()">
+                    ✅ Verifica Soluzione
+                </button>
+                <button class="control-btn secondary" onclick="resetExercise()">
+                    🔄 Ricomincia
+                </button>
+                <button class="control-btn" onclick="saveSolution()">
+                    💾 Salva Soluzione
+                </button>
+                <button class="control-btn" onclick="showOtherSolutions()">
+                    👥 Vedi Altre Soluzioni
+                </button>
+            </div>
+        </div>
+    `;
+    
+    // Inizializza l'esercizio
+    initializeExercise(exercise);
+}
+
+function initializeExercise(exercise) {
+    // Crea posizioni per i segnali
+    createSignalPositions(exercise.signalCount);
+    
+    // Popola griglia segnali disponibili
+    populateSignalGrid();
+    
+    // Imposta segnali di partenza e arrivo fissi
+    setFixedSignals(exercise);
+    
+    // Inizializza array soluzione utente
+    APP_STATE.userSolution = new Array(exercise.signalCount).fill(null);
+    
+    console.log('🚦 Esercizio inizializzato:', exercise);
+}
+
+function createSignalPositions(count) {
     const container = document.getElementById('signalPositions');
     if (!container) return;
     
-    // Controllo di sicurezza
-    if (!currentExercise || !currentExercise.positions) {
-        console.log('⚠️ Esercizio non disponibile per creazione posizioni');
-        return;
-    }
-    
     container.innerHTML = '';
     
-    for (let i = 0; i < currentExercise.positions; i++) {
+    for (let i = 0; i < count; i++) {
         const position = document.createElement('div');
         position.className = 'signal-position';
-        position.dataset.position = i;
+        position.id = `position-${i}`;
+        position.innerHTML = `
+            <div class="signal-slot" onclick="selectSignalPosition(${i})">
+                <span class="position-number">${i + 1}</span>
+                <div class="signal-display" id="signal-${i}">
+                    <span class="signal-placeholder">?</span>
+                </div>
+            </div>
+            <div class="position-label">Pos. ${i + 1}</div>
+        `;
         
-        const number = document.createElement('div');
-        number.className = 'signal-number';
-        number.textContent = `${i + 1}`;
-        position.appendChild(number);
-        
-        position.addEventListener('click', () => selectPosition(i));
         container.appendChild(position);
     }
 }
 
+function populateSignalGrid() {
+    const grid = document.getElementById('signalGrid');
+    if (!grid || typeof SIGNAL_TYPES === 'undefined') return;
+    
+    const signalTypes = APP_STATE.systemType === 2 ? 
+        Object.values(SIGNAL_TYPES).filter(s => s.aspects === 2) :
+        Object.values(SIGNAL_TYPES).filter(s => s.aspects === 3);
+    
+    grid.innerHTML = signalTypes.map(signal => `
+        <div class="signal-option" data-signal-id="${signal.id}" onclick="selectSignalType('${signal.id}')">
+            <div class="signal-icon" style="background-color: ${signal.color}">
+                ${signal.icon}
+            </div>
+            <div class="signal-name">${signal.name}</div>
+        </div>
+    `).join('');
+}
+
+function setFixedSignals(exercise) {
+    // Primo segnale = partenza (verde)
+    const startSignalType = APP_STATE.systemType === 2 ? 'verde' : 'acc_verde';
+    APP_STATE.userSolution[0] = startSignalType;
+    updateSignalDisplay(0, startSignalType);
+    
+    // Ultimo segnale = arrivo (rosso)
+    const endSignalType = APP_STATE.systemType === 2 ? 'rosso' : 'acc_rosso';
+    const lastIndex = exercise.signalCount - 1;
+    APP_STATE.userSolution[lastIndex] = endSignalType;
+    updateSignalDisplay(lastIndex, endSignalType);
+    
+    // Disabilita modifica per primo e ultimo
+    document.getElementById(`signal-${0}`).classList.add('fixed-signal');
+    document.getElementById(`signal-${lastIndex}`).classList.add('fixed-signal');
+}
+
 /**
  * ==========================================
- * GESTIONE SELEZIONI E POSIZIONAMENTO
+ * GESTIONE INTERAZIONE UTENTE
  * ==========================================
  */
 
-function selectPosition(positionIndex) {
-    if (isChecked) return;
-    
-    document.querySelectorAll('.signal-position').forEach(pos => {
-        pos.classList.remove('selected');
-    });
-    
-    const position = document.querySelector(`[data-position="${positionIndex}"]`);
-    if (position) {
-        position.classList.add('selected');
-        selectedPosition = positionIndex;
-        
-        console.log(`📍 Posizione ${positionIndex + 1} selezionata`);
+let selectedPosition = null;
+
+function selectSignalPosition(position) {
+    // Non permette selezione per segnali fissi
+    if (position === 0 || position === APP_STATE.currentExercise.signalCount - 1) {
+        return;
     }
+    
+    // Deseleziona posizione precedente
+    if (selectedPosition !== null) {
+        document.getElementById(`position-${selectedPosition}`).classList.remove('selected');
+    }
+    
+    // Seleziona nuova posizione
+    selectedPosition = position;
+    document.getElementById(`position-${position}`).classList.add('selected');
+    
+    console.log(`📍 Posizione ${position + 1} selezionata`);
 }
 
-function selectSignal(signalId) {
-    if (isChecked) return;
-    
-    document.querySelectorAll('.signal-option').forEach(option => {
-        option.classList.remove('selected');
-    });
-    
-    const option = document.querySelector(`[data-signal-id="${signalId}"]`);
-    if (option) {
-        option.classList.add('selected');
-        selectedSignal = signalId;
-        
-        if (selectedPosition !== null) {
-            placeSignal(selectedPosition, signalId);
-        }
-        
-        console.log(`🚦 Segnale ${signalId} selezionato`);
+function selectSignalType(signalId) {
+    if (selectedPosition === null) {
+        alert('⚠️ Seleziona prima una posizione sul binario!');
+        return;
     }
+    
+    // Aggiorna soluzione utente
+    APP_STATE.userSolution[selectedPosition] = signalId;
+    
+    // Aggiorna visualizzazione
+    updateSignalDisplay(selectedPosition, signalId);
+    
+    // Deseleziona posizione
+    document.getElementById(`position-${selectedPosition}`).classList.remove('selected');
+    selectedPosition = null;
+    
+    console.log(`🚦 Segnale ${signalId} posizionato in posizione ${selectedPosition + 1}`);
 }
 
-function placeSignal(positionIndex, signalId) {
-    const position = document.querySelector(`[data-position="${positionIndex}"]`);
+function updateSignalDisplay(position, signalId) {
+    const display = document.getElementById(`signal-${position}`);
+    if (!display || typeof SIGNAL_TYPES === 'undefined') return;
+    
     const signal = Object.values(SIGNAL_TYPES).find(s => s.id === signalId);
+    if (!signal) return;
     
-    if (!position || !signal) return;
-    
-    const existingIcon = position.querySelector('.signal-icon');
-    if (existingIcon) {
-        existingIcon.remove();
-    }
-    
-    const icon = document.createElement('div');
-    icon.className = `signal-icon ${signal.class}`;
-    icon.textContent = signal.icon;
-    icon.title = `${signal.name} - ${signal.meaning}`;
-    position.appendChild(icon);
-    
-    position.classList.add('filled');
-    position.classList.remove('selected');
-    userSolution[positionIndex] = signalId;
-    
-    // Reset selezioni
-    selectedPosition = null;
-    selectedSignal = null;
-    
-    document.querySelectorAll('.signal-position, .signal-option').forEach(el => {
-        el.classList.remove('selected');
-    });
-    
-    console.log(`✅ Segnale ${signal.name} inserito in posizione ${positionIndex + 1}`);
+    display.innerHTML = `
+        <div class="signal-icon" style="background-color: ${signal.color}">
+            ${signal.icon}
+        </div>
+    `;
+    display.classList.add('filled');
 }
 
 /**
  * ==========================================
- * AZIONI UTENTE (CONTROLLI)
+ * CONTROLLI ESERCIZIO
  * ==========================================
  */
-
-function clearAllSignals() {
-    if (isChecked) return;
-    
-    userSolution = new Array(currentExercise.positions).fill(null);
-    
-    document.querySelectorAll('.signal-position').forEach(position => {
-        const icon = position.querySelector('.signal-icon');
-        if (icon) {
-            icon.remove();
-        }
-        position.classList.remove('filled', 'selected', 'correct', 'incorrect');
-    });
-    
-    selectedPosition = null;
-    selectedSignal = null;
-    
-    document.querySelectorAll('.signal-option').forEach(option => {
-        option.classList.remove('selected');
-    });
-    
-    console.log('🗑️ Tutti i segnali rimossi');
-}
-
-function showHint() {
-    if (isChecked) return;
-    
-    stats.hints++;
-    
-    const emptyPosition = userSolution.findIndex(signal => signal === null);
-    
-    if (emptyPosition !== -1) {
-        const correctSignal = currentExercise.solution[emptyPosition];
-        const signal = Object.values(SIGNAL_TYPES).find(s => s.id === correctSignal);
-        
-        let contextInfo = '';
-        if (currentExercise.trackConfig.includes('deviation')) {
-            contextInfo = '\n\n💡 Ricorda: le deviazioni richiedono segnali con lampeggiamenti alternativi.';
-        } else if (currentExercise.trackConfig.includes('tronchino')) {
-            contextInfo = '\n\n💡 Ricorda: i tronchini richiedono limitazioni severe con lampeggiamenti contemporanei.';
-        } else if (currentExercise.trackConfig.includes('av')) {
-            contextInfo = '\n\n💡 Ricorda: le linee AV usano segnali accoppiati a 3 aspetti.';
-        }
-        
-        alert(`💡 Suggerimento per posizione ${emptyPosition + 1}:\n\n` +
-              `Segnale consigliato: ${signal.name}\n` +
-              `Significato: ${signal.meaning}\n\n` +
-              `Contesto: ${TRACK_CONFIGS[currentExercise.trackConfig]}${contextInfo}`);
-    } else {
-        alert('💡 Hai completato tutte le posizioni!\nClicca "Verifica" per controllare la soluzione.');
-    }
-}
 
 function checkSolution() {
-    if (isChecked) return;
+    const solution = APP_STATE.userSolution;
+    const emptyPositions = solution.filter(s => s === null).length;
     
-    isChecked = true;
-    stats.total++;
+    if (emptyPositions > 0) {
+        alert(`⚠️ Completa tutti i segnali! Mancano ${emptyPositions} posizioni.`);
+        return;
+    }
     
-    const results = [];
-    let correctCount = 0;
+    // Per ora mostra solo un messaggio di conferma
+    // In futuro si potrebbe implementare una logica di validazione
+    alert('✅ Soluzione completata! (Non ci sono risposte "corrette" predefinite)');
     
-    for (let i = 0; i < currentExercise.positions; i++) {
-        const userSignal = userSolution[i];
-        const correctSignal = currentExercise.solution[i];
-        const position = document.querySelector(`[data-position="${i}"]`);
+    console.log('✅ Soluzione verificata:', solution);
+}
+
+function resetExercise() {
+    if (confirm('🔄 Vuoi ricominciare l\'esercizio?')) {
+        initializeExercise(APP_STATE.currentExercise);
+        selectedPosition = null;
+    }
+}
+
+function saveSolution() {
+    const solution = APP_STATE.userSolution;
+    const emptyPositions = solution.filter(s => s === null).length;
+    
+    if (emptyPositions > 0) {
+        alert('⚠️ Completa prima tutti i segnali per salvare!');
+        return;
+    }
+    
+    const userName = prompt('👤 Il tuo nome:', 'Anonimo') || 'Anonimo';
+    
+    const solutionData = {
+        id: generateSolutionId(),
+        railwayId: APP_STATE.currentExercise.railway.id,
+        railwayName: APP_STATE.currentExercise.railway.name,
+        startSignal: APP_STATE.currentExercise.startSignal.id,
+        endSignal: APP_STATE.currentExercise.endSignal.id,
+        solution: [...solution],
+        systemType: APP_STATE.systemType,
+        userName: userName,
+        timestamp: new Date().toISOString(),
+        exercise: APP_STATE.currentExercise
+    };
+    
+    // Salva nel localStorage
+    saveSolutionToDatabase(solutionData);
+    
+    alert(`💾 Soluzione di ${userName} salvata con successo!`);
+    console.log('💾 Soluzione salvata:', solutionData);
+}
+
+function showOtherSolutions() {
+    const exercise = APP_STATE.currentExercise;
+    const solutions = getSolutionsForExercise(exercise.railway.id, exercise.startSignal.id, exercise.endSignal.id);
+    
+    if (solutions.length === 0) {
+        alert('📋 Nessuna altra soluzione trovata per questo percorso.');
+        return;
+    }
+    
+    displaySolutionsComparison(solutions);
+}
+
+function backToRailwaySelection() {
+    if (confirm('🔙 Tornare alla selezione della linea? (Il progresso andrà perso)')) {
+        APP_STATE.currentMode = 'play';
+        APP_STATE.isExerciseActive = false;
+        APP_STATE.currentExercise = null;
         
-        const userSignalObj = userSignal ? Object.values(SIGNAL_TYPES).find(s => s.id === userSignal) : null;
-        const correctSignalObj = Object.values(SIGNAL_TYPES).find(s => s.id === correctSignal);
-        
-        if (userSignal === correctSignal) {
-            position.classList.add('correct');
-            position.classList.remove('incorrect');
-            results.push({
-                position: i + 1,
-                correct: true,
-                userSignal: userSignalObj,
-                correctSignal: correctSignalObj,
-                message: `✅ Corretto: ${correctSignalObj.name}`
-            });
-            correctCount++;
-        } else {
-            position.classList.add('incorrect');
-            position.classList.remove('correct');
-            results.push({
-                position: i + 1,
-                correct: false,
-                userSignal: userSignalObj,
-                correctSignal: correctSignalObj,
-                message: `❌ Sbagliato: ${userSignalObj ? userSignalObj.name : 'Vuoto'} → ${correctSignalObj.name}`
-            });
+        // Torna all'interfaccia di gioco
+        if (typeof switchEditorMode === 'function') {
+            switchEditorMode('play');
         }
     }
-    
-    const isSuccess = correctCount === currentExercise.positions;
-    if (isSuccess) {
-        stats.correct++;
-    }
-    
-    showResults(results, isSuccess);
-    updateStats();
-    
-    const nextBtn = document.getElementById('nextBtn');
-    if (nextBtn) {
-        nextBtn.style.display = 'inline-block';
-    }
-    
-    console.log(`📊 Esercizio completato: ${correctCount}/${currentExercise.positions} corretti`);
-}
-
-function nextExercise() {
-    loadExercise(currentExerciseIndex + 1);
 }
 
 /**
  * ==========================================
- * GESTIONE RISULTATI E FEEDBACK
+ * DATABASE SOLUZIONI
  * ==========================================
  */
 
-function showResults(results, isSuccess) {
-    const resultsDiv = document.getElementById('results');
-    const resultsTitle = document.getElementById('resultsTitle');
-    const resultsGrid = document.getElementById('resultsGrid');
-    const explanation = document.getElementById('explanation');
-    
-    if (!resultsDiv) return;
-    
-    resultsDiv.className = 'results show';
-    resultsDiv.classList.add(isSuccess ? 'success' : 'error');
-    
-    if (resultsTitle) {
-        resultsTitle.innerHTML = isSuccess ? 
-            '🎉 Esercizio Completato Perfettamente!' : 
-            '📚 Rivediamo la soluzione corretta';
-    }
-    
-    if (resultsGrid) {
-        resultsGrid.innerHTML = '';
-        results.forEach(result => {
-            const item = document.createElement('div');
-            item.className = `result-item ${result.correct ? 'correct' : 'incorrect'}`;
-            item.innerHTML = `
-                <strong>Posizione ${result.position}</strong><br>
-                ${result.message}<br>
-                <small><em>${result.correctSignal.meaning}</em></small>
-            `;
-            resultsGrid.appendChild(item);
-        });
-    }
-    
-    if (explanation) {
-        explanation.innerHTML = `
-            <h4>📖 Spiegazione Tecnica</h4>
-            <p><strong>Configurazione:</strong> ${TRACK_CONFIGS[currentExercise.trackConfig]}</p>
-            <p><strong>Soluzione:</strong> ${currentExercise.explanation}</p>
-            ${!isSuccess ? '<p><strong>💡 Analizza le condizioni specifiche dell\'esercizio per comprendere la logica della sequenza.</strong></p>' : ''}
-        `;
-    }
-    
-    resultsDiv.scrollIntoView({ behavior: 'smooth' });
+function saveSolutionToDatabase(solutionData) {
+    let solutions = JSON.parse(localStorage.getItem('rfi_signal_solutions') || '[]');
+    solutions.push(solutionData);
+    localStorage.setItem('rfi_signal_solutions', JSON.stringify(solutions));
 }
 
-function hideResults() {
-    const resultsDiv = document.getElementById('results');
-    if (!resultsDiv) return;
+function getSolutionsForExercise(railwayId, startSignalId, endSignalId) {
+    const solutions = JSON.parse(localStorage.getItem('rfi_signal_solutions') || '[]');
+    return solutions.filter(sol => 
+        sol.railwayId === railwayId && 
+        sol.startSignal === startSignalId && 
+        sol.endSignal === endSignalId
+    );
+}
+
+function displaySolutionsComparison(solutions) {
+    // Crea finestra modale per mostrare soluzioni
+    const modal = document.createElement('div');
+    modal.className = 'solutions-modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>👥 Altre Soluzioni (${solutions.length})</h3>
+                <button class="close-btn" onclick="this.parentElement.parentElement.parentElement.remove()">✕</button>
+            </div>
+            <div class="solutions-list">
+                ${solutions.map((sol, idx) => `
+                    <div class="solution-item">
+                        <h4>👤 ${sol.userName} - ${new Date(sol.timestamp).toLocaleDateString()}</h4>
+                        <div class="solution-signals">
+                            ${sol.solution.map((signalId, pos) => {
+                                const signal = Object.values(SIGNAL_TYPES).find(s => s.id === signalId);
+                                return signal ? `
+                                    <div class="mini-signal" style="background-color: ${signal.color}">
+                                        ${signal.icon}
+                                    </div>
+                                ` : '<div class="mini-signal">?</div>';
+                            }).join('')}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
     
-    resultsDiv.className = 'results';
-    resultsDiv.classList.remove('success', 'error');
-    isChecked = false;
-    
-    const nextBtn = document.getElementById('nextBtn');
-    if (nextBtn) {
-        nextBtn.style.display = 'none';
-    }
-    
-    document.querySelectorAll('.signal-position').forEach(position => {
-        position.classList.remove('correct', 'incorrect');
-    });
+    document.body.appendChild(modal);
+}
+
+function generateSolutionId() {
+    return 'sol_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
 /**
  * ==========================================
- * GESTIONE STATISTICHE E PROGRESSI
+ * UTILITÀ E HELPERS
  * ==========================================
  */
 
-function updateStats() {
-    const correctCount = document.getElementById('correctCount');
-    const totalCount = document.getElementById('totalCount');
-    const accuracyPercent = document.getElementById('accuracyPercent');
+function switchSystemType() {
+    APP_STATE.systemType = APP_STATE.systemType === 2 ? 3 : 2;
     
-    if (correctCount) correctCount.textContent = stats.correct;
-    if (totalCount) totalCount.textContent = stats.total;
-    
-    if (accuracyPercent) {
-        const accuracy = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
-        accuracyPercent.textContent = `${accuracy}%`;
+    if (APP_STATE.isExerciseActive) {
+        populateSignalGrid();
+        setFixedSignals(APP_STATE.currentExercise);
     }
+    
+    console.log(`🔄 Sistema cambiato a ${APP_STATE.systemType} aspetti`);
 }
 
-function updateProgress() {
-    const progressFill = document.getElementById('progressFill');
-    if (progressFill) {
-        const progress = ((currentExerciseIndex + 1) / currentExercises.length) * 100;
-        progressFill.style.width = `${progress}%`;
-    }
-}
+// Esporta funzioni globali
+window.APP_STATE = APP_STATE;
+window.handleSignalSelection = handleSignalSelection;
+window.resetSignalSelection = resetSignalSelection;
+window.startSignalExercise = startSignalExercise;
+window.selectSignalPosition = selectSignalPosition;
+window.selectSignalType = selectSignalType;
+window.checkSolution = checkSolution;
+window.resetExercise = resetExercise;
+window.saveSolution = saveSolution;
+window.showOtherSolutions = showOtherSolutions;
+window.backToRailwaySelection = backToRailwaySelection;
+window.switchSystemType = switchSystemType;
 
-function showCompletionMessage() {
-    const accuracy = Math.round((stats.correct / stats.total) * 100);
-    let level = '';
-    
-    if (accuracy >= 95) level = 'ESPERTO RFI CERTIFICATO 🏆';
-    else if (accuracy >= 85) level = 'OPERATORE SENIOR 🥇';
-    else if (accuracy >= 75) level = 'OPERATORE QUALIFICATO 🥈';
-    else if (accuracy >= 60) level = 'OPERATORE BASE 🥉';
-    else level = 'IN FORMAZIONE 📚';
-    
-    const systemName = currentSystem === 2 ? '2 ASPETTI' : '3 ASPETTI';
-    
-    alert(`🎊 COMPLIMENTI! 🎊\n\n` +
-          `Hai completato tutti gli esercizi del sistema ${systemName}!\n\n` +
-          `📊 STATISTICHE FINALI:\n` +
-          `• Esercizi corretti: ${stats.correct}/${stats.total}\n` +
-          `• Precisione: ${accuracy}%\n` +
-          `• Suggerimenti usati: ${stats.hints}\n` +
-          `• Livello raggiunto: ${level}\n\n` +
-          `${currentSystem === 2 ? 'Prova ora il sistema a 3 aspetti!' : 'Hai completato entrambi i sistemi!'}`);
-}
-
-/**
- * ==========================================
- * API DEBUG (FUNZIONI DI SVILUPPO)
- * ==========================================
- */
-
-// API Debug per sviluppatori
-window.debugRFI = {
-    currentExercise: () => currentExercise,
-    userSolution: () => userSolution,
-    currentSystem: () => currentSystem,
-    showSolution: () => {
-        console.table(currentExercise.solution.map((signal, i) => ({
-            posizione: i + 1,
-            segnaleCorretto: signal,
-            nomeCorretto: Object.values(SIGNAL_TYPES).find(s => s.id === signal)?.name || 'N/A',
-            segnaleUtente: userSolution[i] || 'vuoto',
-            nomeUtente: userSolution[i] ? Object.values(SIGNAL_TYPES).find(s => s.id === userSolution[i])?.name || 'N/A' : 'vuoto'
-        })));
-    },
-    stats: () => stats,
-    jumpToExercise: (index) => loadExercise(index),
-    switchSystem: (system) => switchSystem(system),
-    SIGNAL_TYPES,
-    EXERCISES_2_ASPECT,
-    EXERCISES_3_ASPECT,
-    TRACK_CONFIGS
-};
-
-console.log('🚂 Simulatore Segnali RFI Completo inizializzato!');
-console.log('🔧 Usa window.debugRFI per funzioni di debug avanzate'); 
+console.log('🎮 Main Controller inizializzato'); 

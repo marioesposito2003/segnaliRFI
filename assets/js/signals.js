@@ -5,19 +5,7 @@
  * Sistemi a 2 e 3 aspetti conformi alle normative
  */
 
-// Configurazioni dei tipi di binario
-const TRACK_CONFIGS = {
-    simple: "Linea semplice banalizzata",
-    double: "Linea doppia",
-    station: "Stazione/Fermata",
-    deviation: "Binario deviato",
-    tronchino: "Tronchino/Binario di servizio", 
-    av: "Linea Alta Velocità",
-    av_deviation: "Deviazione AV",
-    maintenance_depot: "Deposito/Officina",
-    industrial_siding: "Raccordo industriale",
-    passing_loop: "Posto di movimento/Bivio"
-};
+// Le configurazioni dei binari sono definite in exercises.js
 
 // Database completo tipi di segnali
 const SIGNAL_TYPES = {
@@ -29,8 +17,10 @@ const SIGNAL_TYPES = {
         name: 'Rosso',
         category: 'prima_categoria',
         system: 2,
+        aspects: 2,
         class: 'signal-rosso',
         icon: 'R',
+        color: '#e74c3c',
         meaning: 'Alt - Fermata assoluta'
     },
     VERDE: {
@@ -38,8 +28,10 @@ const SIGNAL_TYPES = {
         name: 'Verde',
         category: 'prima_categoria',
         system: 2,
+        aspects: 2,
         class: 'signal-verde',
         icon: 'V',
+        color: '#27ae60',
         meaning: 'Via libera'
     },
     ROSSO_VERDE: {
@@ -47,8 +39,10 @@ const SIGNAL_TYPES = {
         name: 'Rosso-Verde',
         category: 'prima_categoria',
         system: 2,
+        aspects: 2,
         class: 'signal-rosso-verde',
         icon: 'RV',
+        color: '#e67e22',
         meaning: 'Via libera condizionata'
     },
     DOPPIO_GIALLO: {
@@ -56,8 +50,10 @@ const SIGNAL_TYPES = {
         name: 'Doppio Giallo',
         category: 'prima_categoria',
         system: 2,
+        aspects: 2,
         class: 'signal-doppio-giallo',
         icon: 'GG',
+        color: '#f39c12',
         meaning: 'Preavviso di fermata'
     },
 
@@ -69,8 +65,10 @@ const SIGNAL_TYPES = {
         name: 'Avviso Giallo',
         category: 'avviso',
         system: 2,
+        aspects: 2,
         class: 'signal-avviso-giallo',
         icon: 'A-G',
+        color: '#f39c12',
         meaning: 'Preavviso di aspetto non favorevole'
     },
     AVVISO_GIALLO_LAMPEGGIANTE: {
@@ -259,6 +257,66 @@ const SIGNAL_TYPES = {
     }
 };
 
+/**
+ * ==========================================
+ * INIZIALIZZAZIONE E COMPATIBILITÀ
+ * ==========================================
+ */
+
+// Funzione per aggiornare automaticamente i segnali con proprietà mancanti
+function enhanceSignalTypes() {
+    Object.values(SIGNAL_TYPES).forEach(signal => {
+        // Aggiunge aspects se mancante
+        if (!signal.aspects) {
+            signal.aspects = signal.system;
+        }
+        
+        // Aggiunge colori di default se mancanti
+        if (!signal.color) {
+            if (signal.id.includes('rosso')) {
+                signal.color = '#e74c3c';
+            } else if (signal.id.includes('verde')) {
+                signal.color = '#27ae60';
+            } else if (signal.id.includes('giallo')) {
+                signal.color = '#f39c12';
+            } else if (signal.category === 'avviso') {
+                signal.color = '#3498db';
+            } else if (signal.category === 'accoppiato') {
+                signal.color = '#9b59b6';
+            } else {
+                signal.color = '#7f8c8d';
+            }
+        }
+    });
+}
+
+// Funzione di caricamento per compatibilità con main.js
+function loadSignalTypes() {
+    enhanceSignalTypes();
+    console.log('🚦 Tipi di segnali caricati:', Object.keys(SIGNAL_TYPES).length);
+    return SIGNAL_TYPES;
+}
+
+// Utility per ottenere segnali per sistema
+function getSignalsBySystem(aspects) {
+    return Object.values(SIGNAL_TYPES).filter(signal => signal.aspects === aspects);
+}
+
+// Utility per ottenere segnali per categoria
+function getSignalsByCategory(category, aspects = null) {
+    return Object.values(SIGNAL_TYPES).filter(signal => 
+        signal.category === category && 
+        (aspects === null || signal.aspects === aspects)
+    );
+}
+
+// Inizializzazione automatica
+enhanceSignalTypes();
+
 // Esporta per uso globale
 window.SIGNAL_TYPES = SIGNAL_TYPES;
-window.TRACK_CONFIGS = TRACK_CONFIGS; 
+window.loadSignalTypes = loadSignalTypes;
+window.getSignalsBySystem = getSignalsBySystem;
+window.getSignalsByCategory = getSignalsByCategory;
+
+console.log('🚦 Sistema segnali RFI inizializzato'); 
